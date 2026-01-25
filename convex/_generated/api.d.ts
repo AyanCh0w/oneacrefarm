@@ -8,13 +8,17 @@
  * @module
  */
 
+import type * as sheets from "../sheets.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  sheets: typeof sheets;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
