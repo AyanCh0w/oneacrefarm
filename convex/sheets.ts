@@ -133,10 +133,10 @@ export const getUniqueCrops = query({
   },
 });
 
-// Mutation to sync vegetables (qualifiers) data
-export const syncVegetables = mutation({
+// Mutation to sync qualifiers data
+export const syncQualifiers = mutation({
   args: {
-    vegetables: v.array(
+    qualifiers: v.array(
       v.object({
         name: v.string(),
         assessments: v.array(
@@ -149,29 +149,29 @@ export const syncVegetables = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const { vegetables } = args;
+    const { qualifiers } = args;
     const results = [];
 
-    for (const vegetable of vegetables) {
-      // Check if this vegetable already exists
+    for (const qualifier of qualifiers) {
+      // Check if this qualifier already exists
       const existing = await ctx.db
-        .query("vegetables")
-        .withIndex("by_name", (q) => q.eq("name", vegetable.name))
+        .query("qualifiers")
+        .withIndex("by_name", (q) => q.eq("name", qualifier.name))
         .first();
 
       if (existing) {
         await ctx.db.patch(existing._id, {
-          assessments: vegetable.assessments,
+          assessments: qualifier.assessments,
           lastSynced: Date.now(),
         });
-        results.push({ name: vegetable.name, action: "updated", id: existing._id });
+        results.push({ name: qualifier.name, action: "updated", id: existing._id });
       } else {
-        const id = await ctx.db.insert("vegetables", {
-          name: vegetable.name,
-          assessments: vegetable.assessments,
+        const id = await ctx.db.insert("qualifiers", {
+          name: qualifier.name,
+          assessments: qualifier.assessments,
           lastSynced: Date.now(),
         });
-        results.push({ name: vegetable.name, action: "created", id });
+        results.push({ name: qualifier.name, action: "created", id });
       }
     }
 
@@ -183,19 +183,19 @@ export const syncVegetables = mutation({
   },
 });
 
-// Get all vegetables
-export const getAllVegetables = query({
+// Get all qualifiers
+export const getAllQualifiers = query({
   handler: async (ctx) => {
-    return ctx.db.query("vegetables").collect();
+    return ctx.db.query("qualifiers").collect();
   },
 });
 
-// Get vegetable by name
-export const getVegetableByName = query({
+// Get qualifier by name
+export const getQualifierByName = query({
   args: { name: v.string() },
   handler: async (ctx, args) => {
     return ctx.db
-      .query("vegetables")
+      .query("qualifiers")
       .withIndex("by_name", (q) => q.eq("name", args.name))
       .first();
   },
@@ -328,5 +328,58 @@ export const getUniqueVarieties = query({
     const crops = await ctx.db.query("crops").collect();
     const varieties = [...new Set(crops.map((c) => c.variety).filter((v) => v && v.trim() !== ""))];
     return varieties;
+  },
+});
+
+// Delete a quality log by ID
+export const deleteQualityLog = mutation({
+  args: { id: v.id("qualityLogs") },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error("Quality log not found");
+    }
+    await ctx.db.delete(args.id);
+    return { success: true };
+  },
+});
+
+// Delete sheet data and associated crops by field/sheet name
+export const deleteSheetByField = mutation({
+  args: {
+    spreadsheetId: v.string(),
+    fieldName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { spreadsheetId, fieldName } = args;
+
+    // Find and delete the sheet record
+    const range = `${fieldName}!A:ZZ`;
+    const existingSheet = await ctx.db
+      .query("sheets")
+      .withIndex("by_spreadsheet_and_range", (q) =>
+        q.eq("spreadsheetId", spreadsheetId).eq("range", range)
+      )
+      .first();
+
+    if (existingSheet) {
+      await ctx.db.delete(existingSheet._id);
+    }
+
+    // Delete all crops associated with this field
+    const existingCrops = await ctx.db
+      .query("crops")
+      .withIndex("by_field", (q) => q.eq("field", fieldName))
+      .collect();
+
+    for (const crop of existingCrops) {
+      await ctx.db.delete(crop._id);
+    }
+
+    return {
+      success: true,
+      deletedSheet: existingSheet !== null,
+      deletedCropsCount: existingCrops.length,
+    };
   },
 });

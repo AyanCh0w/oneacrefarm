@@ -29,8 +29,8 @@ interface Crop {
   lastSynced: number;
 }
 
-interface Vegetable {
-  _id: Id<"vegetables">;
+interface Qualifier {
+  _id: Id<"qualifiers">;
   name: string;
   assessments: {
     name: string;
@@ -275,12 +275,12 @@ function OptionButton({
 
 // Data Entry Component - All questions on one page
 function DataEntryForm({
-  vegetable,
+  qualifier,
   selectedCrop,
   onSubmit,
   onBack,
 }: {
-  vegetable: Vegetable;
+  qualifier: Qualifier;
   selectedCrop: Crop;
   onSubmit: (responses: { question: string; answer: string }[], notes?: string) => void;
   onBack: () => void;
@@ -288,7 +288,7 @@ function DataEntryForm({
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
 
-  const assessments = vegetable.assessments;
+  const assessments = qualifier.assessments;
   const answeredCount = Object.keys(responses).length;
   const allAnswered = assessments.every((a) => responses[a.name]);
 
@@ -482,7 +482,7 @@ export default function LogDataPage() {
 
   // Convex queries
   const crops = useQuery(api.sheets.getAllCrops);
-  const vegetables = useQuery(api.sheets.getAllVegetables);
+  const qualifiers = useQuery(api.sheets.getAllQualifiers);
   const uniqueFields = useQuery(api.sheets.getUniqueFields);
   const createQualityLog = useMutation(api.sheets.createQualityLog);
 
@@ -514,12 +514,12 @@ export default function LogDataPage() {
     }
   });
 
-  // Get the vegetable definition for the selected crop
+  // Get the qualifier definition for the selected crop
   // Match by base crop name (before the colon)
-  const selectedVegetable = selectedCrop && vegetables
-    ? vegetables.find((v) => {
+  const selectedQualifier = selectedCrop && qualifiers
+    ? qualifiers.find((q) => {
         const baseCropName = getBaseCropName(selectedCrop.crop);
-        return v.name.toLowerCase() === baseCropName.toLowerCase();
+        return q.name.toLowerCase() === baseCropName.toLowerCase();
       })
     : null;
 
@@ -767,11 +767,11 @@ export default function LogDataPage() {
         {/* Data Entry Step */}
         {step === "data-entry" && selectedCrop && (
           <>
-            {!vegetables ? (
+            {!qualifiers ? (
               <QuestionSkeleton />
-            ) : selectedVegetable ? (
+            ) : selectedQualifier ? (
               <DataEntryForm
-                vegetable={selectedVegetable}
+                qualifier={selectedQualifier}
                 selectedCrop={selectedCrop}
                 onSubmit={handleSubmit}
                 onBack={handleBackToCrops}

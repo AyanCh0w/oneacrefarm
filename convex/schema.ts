@@ -40,7 +40,7 @@ export default defineSchema({
     .index("by_bed", ["bed"])
     .index("by_crop", ["crop"]),
 
-  vegetables: defineTable({
+  qualifiers: defineTable({
     name: v.string(),
     assessments: v.array(
       v.object({
