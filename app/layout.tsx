@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
+import { ThemeSync } from "@/components/theme-sync";
 import "./globals.css";
 
 const inter = Inter({
@@ -31,11 +32,6 @@ export default function RootLayout({
         baseTheme: dark,
         variables: {
           colorPrimary: "#34d399",
-          colorBackground: "#1c1917",
-          colorInputBackground: "#292524",
-          colorInputText: "#fafaf9",
-          colorText: "#fafaf9",
-          colorTextSecondary: "#a8a29e",
           borderRadius: "0.45rem",
         },
         elements: {
@@ -44,10 +40,29 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" className="dark">
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  try {
+                    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    if (prefersDark) {
+                      document.documentElement.classList.add('dark');
+                    } else {
+                      document.documentElement.classList.remove('dark');
+                    }
+                  } catch (e) {}
+                })();
+              `,
+            }}
+          />
+        </head>
         <body
           className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground`}
         >
+          <ThemeSync />
           <Providers>{children}</Providers>
         </body>
       </html>

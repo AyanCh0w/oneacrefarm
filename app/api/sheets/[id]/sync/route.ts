@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { GoogleSheetsClient } from "@/lib/google-sheets";
+import { parseQualifiersSheet } from "@/lib/parse-qualifiers";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -124,7 +125,36 @@ export async function POST(
       row.map((cell) => String(cell ?? ""))
     );
 
-    // Parse the data
+    // Check if this is the Qualifiers sheet
+    const isQualifiersSheet = sheetName.toLowerCase() === "qualifiers";
+
+    if (isQualifiersSheet) {
+      // Parse Qualifiers data into vegetables
+      const vegetables = parseQualifiersSheet(stringValues);
+
+      // Sync vegetables to Convex
+      const vegetablesResult = await convex.mutation(api.sheets.syncVegetables, {
+        vegetables,
+      });
+
+      // Also store raw sheet data
+      const sheetResult = await convex.mutation(api.sheets.syncSheetData, {
+        spreadsheetId,
+        range: `${sheetName}!A:ZZ`,
+        data: stringValues,
+      });
+
+      return NextResponse.json({
+        success: true,
+        synced: true,
+        rowCount: stringValues.length,
+        vegetablesCount: vegetablesResult.count,
+        vegetables: vegetablesResult.results,
+        sheetResult,
+      });
+    }
+
+    // Parse field data (non-Qualifiers sheets)
     const parsedData = parseSheetData(stringValues, sheetName);
 
     // Sync to Convex

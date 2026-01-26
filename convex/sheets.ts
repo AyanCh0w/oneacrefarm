@@ -132,3 +132,181 @@ export const getUniqueCrops = query({
     return uniqueCrops.sort();
   },
 });
+
+// Mutation to sync vegetables (qualifiers) data
+export const syncVegetables = mutation({
+  args: {
+    vegetables: v.array(
+      v.object({
+        name: v.string(),
+        assessments: v.array(
+          v.object({
+            name: v.string(),
+            options: v.array(v.string()),
+          })
+        ),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { vegetables } = args;
+    const results = [];
+
+    for (const vegetable of vegetables) {
+      // Check if this vegetable already exists
+      const existing = await ctx.db
+        .query("vegetables")
+        .withIndex("by_name", (q) => q.eq("name", vegetable.name))
+        .first();
+
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          assessments: vegetable.assessments,
+          lastSynced: Date.now(),
+        });
+        results.push({ name: vegetable.name, action: "updated", id: existing._id });
+      } else {
+        const id = await ctx.db.insert("vegetables", {
+          name: vegetable.name,
+          assessments: vegetable.assessments,
+          lastSynced: Date.now(),
+        });
+        results.push({ name: vegetable.name, action: "created", id });
+      }
+    }
+
+    return {
+      success: true,
+      count: results.length,
+      results,
+    };
+  },
+});
+
+// Get all vegetables
+export const getAllVegetables = query({
+  handler: async (ctx) => {
+    return ctx.db.query("vegetables").collect();
+  },
+});
+
+// Get vegetable by name
+export const getVegetableByName = query({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("vegetables")
+      .withIndex("by_name", (q) => q.eq("name", args.name))
+      .first();
+  },
+});
+
+// ============ Quality Logs ============
+
+// Create a new quality log entry
+export const createQualityLog = mutation({
+  args: {
+    cropId: v.optional(v.id("crops")),
+    crop: v.string(),
+    variety: v.string(),
+    field: v.string(),
+    bed: v.string(),
+    datePlanted: v.string(),
+    trays: v.string(),
+    rows: v.string(),
+    plantingNotes: v.string(),
+    responses: v.array(
+      v.object({
+        question: v.string(),
+        answer: v.string(),
+      })
+    ),
+    logNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const logId = await ctx.db.insert("qualityLogs", {
+      ...args,
+      assessmentDate: now,
+      createdAt: now,
+    });
+    return { success: true, logId };
+  },
+});
+
+// Get all quality logs
+export const getAllQualityLogs = query({
+  handler: async (ctx) => {
+    return ctx.db.query("qualityLogs").order("desc").collect();
+  },
+});
+
+// Get quality logs by crop type
+export const getQualityLogsByCrop = query({
+  args: { crop: v.string() },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("qualityLogs")
+      .withIndex("by_crop", (q) => q.eq("crop", args.crop))
+      .order("desc")
+      .collect();
+  },
+});
+
+// Get quality logs by field
+export const getQualityLogsByField = query({
+  args: { field: v.string() },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("qualityLogs")
+      .withIndex("by_field", (q) => q.eq("field", args.field))
+      .order("desc")
+      .collect();
+  },
+});
+
+// Get recent quality logs (for dashboard/stats)
+export const getRecentQualityLogs = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+    return ctx.db.query("qualityLogs").order("desc").take(limit);
+  },
+});
+
+// Get quality log stats (aggregated data for charts)
+export const getQualityLogStats = query({
+  handler: async (ctx) => {
+    const logs = await ctx.db.query("qualityLogs").collect();
+
+    // Group logs by crop
+    const byCrop: Record<string, number> = {};
+    // Group logs by field
+    const byField: Record<string, number> = {};
+    // Group responses by question and answer
+    const responseStats: Record<string, Record<string, number>> = {};
+
+    for (const log of logs) {
+      // Count by crop
+      byCrop[log.crop] = (byCrop[log.crop] || 0) + 1;
+      // Count by field
+      byField[log.field] = (byField[log.field] || 0) + 1;
+
+      // Count responses
+      for (const response of log.responses) {
+        if (!responseStats[response.question]) {
+          responseStats[response.question] = {};
+        }
+        responseStats[response.question][response.answer] =
+          (responseStats[response.question][response.answer] || 0) + 1;
+      }
+    }
+
+    return {
+      totalLogs: logs.length,
+      byCrop,
+      byField,
+      responseStats,
+    };
+  },
+});
