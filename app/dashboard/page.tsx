@@ -6,8 +6,16 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { UserButton, UserProfile } from "@clerk/clerk-react";
+import { Id } from "@/convex/_generated/dataModel";
 
 interface SheetConfig {
   spreadsheetId: string;
@@ -114,12 +122,15 @@ export default function DashboardPage() {
     currentField: "",
     status: "idle",
   });
+  const [selectedLogId, setSelectedLogId] = useState<Id<"qualityLogs"> | null>(null);
 
   // Convex queries
   const crops = useQuery(api.sheets.getAllCrops);
   const vegetables = useQuery(api.sheets.getAllVegetables);
   const qualityLogs = useQuery(api.sheets.getRecentQualityLogs, { limit: 10 });
   const uniqueFields = useQuery(api.sheets.getUniqueFields);
+  const uniqueVarieties = useQuery(api.sheets.getUniqueVarieties);
+  const lastSyncTime = useQuery(api.sheets.getLastSyncTime);
 
   // Load config from localStorage
   useEffect(() => {
@@ -194,6 +205,31 @@ export default function DashboardPage() {
     }
   }, [config, syncProgress.status]);
 
+  // Get selected log details
+  const selectedLog = qualityLogs?.find((log) => log._id === selectedLogId);
+
+  // Format last sync time
+  const formatLastSync = (timestamp: number | null) => {
+    if (!timestamp) return "Never synced";
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? "s" : ""} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Get unique crop types count
+  const uniqueCropTypes = crops
+    ? [...new Set(crops.map((c) => c.crop))].length
+    : 0;
+
   // No config - show setup prompt
   if (configLoaded && !config) {
     return (
@@ -236,7 +272,14 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Sync Data</CardTitle>
+              <div className="flex-1">
+                <CardTitle>Sync Data</CardTitle>
+                {syncProgress.status === "idle" && lastSyncTime !== undefined && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last synced: {formatLastSync(lastSyncTime)}
+                  </p>
+                )}
+              </div>
               {syncProgress.status === "idle" && (
                 <Button onClick={syncAllSheets} size="sm">
                   Sync Now
@@ -310,10 +353,14 @@ export default function DashboardPage() {
             loading={crops === undefined}
           />
           <StatsCard
-            title="Vegetables"
-            value={vegetables?.length ?? 0}
-            subtitle="with qualifiers"
-            loading={vegetables === undefined}
+            title="Crop Types"
+            value={uniqueCropTypes}
+            subtitle={
+              uniqueVarieties
+                ? `${uniqueVarieties.length} varieties`
+                : undefined
+            }
+            loading={crops === undefined || uniqueVarieties === undefined}
           />
           <StatsCard
             title="Quality Logs"
@@ -337,9 +384,10 @@ export default function DashboardPage() {
             <CardContent>
               <div className="space-y-3">
                 {qualityLogs.slice(0, 5).map((log) => (
-                  <div
+                  <button
                     key={log._id}
-                    className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
+                    onClick={() => setSelectedLogId(log._id)}
+                    className="w-full flex items-center justify-between py-2 border-b border-border/50 last:border-0 hover:bg-muted/30 rounded px-2 -mx-2 transition-colors cursor-pointer text-left"
                   >
                     <div>
                       <p className="font-medium">
@@ -363,12 +411,93 @@ export default function DashboardPage() {
                         {log.responses.length} responses
                       </p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Quality Log Detail Dialog */}
+        <Dialog open={selectedLogId !== null} onOpenChange={(open) => !open && setSelectedLogId(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            {selectedLog && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-xl">
+                    {selectedLog.crop}
+                    {selectedLog.variety && (
+                      <span className="text-muted-foreground font-normal ml-2">
+                        ({selectedLog.variety})
+                      </span>
+                    )}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Logged on {new Date(selectedLog.assessmentDate).toLocaleDateString()} at{" "}
+                    {new Date(selectedLog.assessmentDate).toLocaleTimeString()}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-6 mt-4">
+                  {/* Location Info */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <span className="text-muted-foreground block text-xs mb-1">Field</span>
+                      <span className="font-medium">{selectedLog.field}</span>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <span className="text-muted-foreground block text-xs mb-1">Bed</span>
+                      <span className="font-medium">{selectedLog.bed || "—"}</span>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <span className="text-muted-foreground block text-xs mb-1">Planted</span>
+                      <span className="font-medium">{selectedLog.datePlanted || "—"}</span>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <span className="text-muted-foreground block text-xs mb-1">Trays</span>
+                      <span className="font-medium">{selectedLog.trays || "—"}</span>
+                    </div>
+                  </div>
+
+                  {/* Planting Notes */}
+                  {selectedLog.plantingNotes && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2">Planting Notes</h3>
+                      <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                        {selectedLog.plantingNotes}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Assessment Responses */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3">Assessment Responses</h3>
+                    <div className="space-y-3">
+                      {selectedLog.responses.map((response, index) => (
+                        <div key={index} className="border border-border rounded-lg p-3">
+                          <p className="text-sm font-medium mb-1">{response.question}</p>
+                          <p className="text-sm text-muted-foreground bg-primary/10 rounded px-2 py-1 inline-block">
+                            {response.answer}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Log Notes */}
+                  {selectedLog.logNotes && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2">Additional Notes</h3>
+                      <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                        {selectedLog.logNotes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Empty state for logs */}
         {qualityLogs &&

@@ -5,5 +5,10 @@
       "Bash(npm run build:*)",
       "Bash(dir /b \"C:\\\\Users\\\\blu\\\\Desktop\\\\oneacrefarm\\\\convex\")"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase",
+    "shadcn"
+  ],
+  "enableAllProjectMcpServers": true
 }

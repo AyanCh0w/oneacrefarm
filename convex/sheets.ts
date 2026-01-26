@@ -310,3 +310,23 @@ export const getQualityLogStats = query({
     };
   },
 });
+
+// Get last sync time
+export const getLastSyncTime = query({
+  handler: async (ctx) => {
+    const sheets = await ctx.db.query("sheets").collect();
+    if (sheets.length === 0) return null;
+
+    const lastSyncTimes = sheets.map((s) => s.lastSynced);
+    return Math.max(...lastSyncTimes);
+  },
+});
+
+// Get unique varieties count
+export const getUniqueVarieties = query({
+  handler: async (ctx) => {
+    const crops = await ctx.db.query("crops").collect();
+    const varieties = [...new Set(crops.map((c) => c.variety).filter((v) => v && v.trim() !== ""))];
+    return varieties;
+  },
+});

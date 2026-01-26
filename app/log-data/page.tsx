@@ -497,6 +497,23 @@ export default function LogDataPage() {
     cropCountByField[c.field] = (cropCountByField[c.field] || 0) + 1;
   });
 
+  // Group fields by parent (if they have colon notation like "Parent:SubField")
+  const groupedFields: Record<string, string[]> = {};
+  const standaloneFields: string[] = [];
+
+  uniqueFields?.forEach((field) => {
+    if (field.includes(":")) {
+      const [parent, subfield] = field.split(":");
+      const parentKey = parent.trim();
+      if (!groupedFields[parentKey]) {
+        groupedFields[parentKey] = [];
+      }
+      groupedFields[parentKey].push(field);
+    } else {
+      standaloneFields.push(field);
+    }
+  });
+
   // Get the vegetable definition for the selected crop
   // Match by base crop name (before the colon)
   const selectedVegetable = selectedCrop && vegetables
@@ -639,30 +656,57 @@ export default function LogDataPage() {
               </Card>
             )}
 
-            {/* List View - Grid Layout */}
+            {/* List View - Grid Layout with Categorization */}
             {viewMode === "list" && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="space-y-6">
                 {isLoading ? (
-                  <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <FieldButtonSkeleton />
                     <FieldButtonSkeleton />
                     <FieldButtonSkeleton />
                     <FieldButtonSkeleton />
                     <FieldButtonSkeleton />
                     <FieldButtonSkeleton />
-                  </>
+                  </div>
                 ) : uniqueFields && uniqueFields.length > 0 ? (
-                  uniqueFields.map((field) => (
-                    <FieldButton
-                      key={field}
-                      field={field}
-                      cropCount={cropCountByField[field] || 0}
-                      onSelect={() => handleFieldSelect(field)}
-                      isSelected={selectedField === field}
-                    />
-                  ))
+                  <>
+                    {/* Standalone fields (no colon) */}
+                    {standaloneFields.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {standaloneFields.map((field) => (
+                          <FieldButton
+                            key={field}
+                            field={field}
+                            cropCount={cropCountByField[field] || 0}
+                            onSelect={() => handleFieldSelect(field)}
+                            isSelected={selectedField === field}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Grouped fields (parent:subfield) */}
+                    {Object.entries(groupedFields).map(([parent, fields]) => (
+                      <div key={parent}>
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">
+                          {parent}
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {fields.map((field) => (
+                            <FieldButton
+                              key={field}
+                              field={field.split(":")[1]?.trim() || field}
+                              cropCount={cropCountByField[field] || 0}
+                              onSelect={() => handleFieldSelect(field)}
+                              isSelected={selectedField === field}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </>
                 ) : (
-                  <Card className="col-span-full p-8 text-center">
+                  <Card className="p-8 text-center">
                     <p className="text-muted-foreground">No fields found.</p>
                   </Card>
                 )}
