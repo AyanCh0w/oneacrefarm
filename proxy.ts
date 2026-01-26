@@ -19,8 +19,9 @@ export default clerkMiddleware(async (auth, req) => {
 
   // If user is signed in, check if they're approved
   if (userId) {
-    const isApproved = sessionClaims?.metadata?.approved === true;
-    const isAdmin = sessionClaims?.metadata?.role === "admin";
+    const metadata = sessionClaims?.metadata as { approved?: boolean; role?: string } | undefined;
+    const isApproved = metadata?.approved === true;
+    const isAdmin = metadata?.role === "admin";
 
     // Admins are always approved
     if (isAdmin) {

@@ -188,7 +188,7 @@ export async function POST(
         {
           error: "Sheet not found",
           code: "SHEET_NOT_FOUND",
-          message: `Sheet "${body?.sheetName}" was not found. It may have been renamed or deleted.`,
+          message: `The requested sheet was not found. It may have been renamed or deleted.`,
         },
         { status: 404 }
       );
