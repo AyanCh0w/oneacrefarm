@@ -129,12 +129,12 @@ export async function POST(
     const isQualifiersSheet = sheetName.toLowerCase() === "qualifiers";
 
     if (isQualifiersSheet) {
-      // Parse Qualifiers data into vegetables
-      const vegetables = parseQualifiersSheet(stringValues);
+      // Parse Qualifiers data
+      const qualifiers = parseQualifiersSheet(stringValues);
 
-      // Sync vegetables to Convex
-      const vegetablesResult = await convex.mutation(api.sheets.syncVegetables, {
-        vegetables,
+      // Sync qualifiers to Convex
+      const qualifiersResult = await convex.mutation(api.sheets.syncQualifiers, {
+        qualifiers,
       });
 
       // Also store raw sheet data
@@ -148,8 +148,8 @@ export async function POST(
         success: true,
         synced: true,
         rowCount: stringValues.length,
-        vegetablesCount: vegetablesResult.count,
-        vegetables: vegetablesResult.results,
+        qualifiersCount: qualifiersResult.count,
+        qualifiers: qualifiersResult.results,
         sheetResult,
       });
     }
@@ -175,10 +175,29 @@ export async function POST(
   } catch (error) {
     console.error("Error syncing sheet data:", error);
 
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+    // Check if the error is due to sheet not found (renamed or deleted)
+    const isSheetNotFound =
+      errorMessage.includes("Unable to parse range") ||
+      errorMessage.includes("is not a valid range") ||
+      errorMessage.includes("Requested entity was not found");
+
+    if (isSheetNotFound) {
+      return NextResponse.json(
+        {
+          error: "Sheet not found",
+          code: "SHEET_NOT_FOUND",
+          message: `Sheet "${body?.sheetName}" was not found. It may have been renamed or deleted.`,
+        },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to sync sheet data",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: errorMessage,
       },
       { status: 500 }
     );
