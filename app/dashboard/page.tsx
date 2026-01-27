@@ -240,6 +240,7 @@ export default function DashboardPage() {
               initialZoom={17}
               initialBearing={-67.2}
               initialPitch={0}
+              showFieldLabels
             />
           </CardContent>
         </Card>

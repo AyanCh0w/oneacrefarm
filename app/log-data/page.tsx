@@ -671,6 +671,7 @@ export default function LogDataPage() {
                       initialBearing={-67.2}
                       initialPitch={0}
                       onFeatureClick={handleFeatureClick}
+                      showFieldLabels
                     />
                   </CardContent>
                 </Card>

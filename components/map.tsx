@@ -23,6 +23,7 @@ interface MapboxMapProps {
   onFeatureClick?: (feature: MapFeature) => void;
   interactiveLayers?: string[];
   autoDiscoverLayers?: boolean;
+  showFieldLabels?: boolean;
   markers?: Array<{
     id: string;
     coordinates: [number, number];
@@ -43,6 +44,7 @@ export function MapboxMap({
   onFeatureClick,
   interactiveLayers = [],
   autoDiscoverLayers = false,
+  showFieldLabels = false,
   markers = [],
 }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -104,6 +106,44 @@ export function MapboxMap({
             });
           }
         });
+      }
+
+      // Add field name labels on polygons
+      if (showFieldLabels && map.current) {
+        const mapStyle = map.current.getStyle();
+        if (mapStyle?.layers) {
+          // Find fill layers that might be fields
+          const fillLayers = mapStyle.layers.filter(
+            (layer) => layer.type === "fill" && layer.source
+          );
+
+          fillLayers.forEach((layer) => {
+            const sourceId = layer.source as string;
+            const labelLayerId = `${layer.id}-labels`;
+
+            // Check if label layer already exists
+            if (!map.current!.getLayer(labelLayerId)) {
+              const sourceLayer = (layer as Record<string, unknown>)["source-layer"] as string | undefined;
+              map.current!.addLayer({
+                id: labelLayerId,
+                type: "symbol",
+                source: sourceId,
+                ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
+                layout: {
+                  "text-field": ["coalesce", ["get", "name"], ["get", "Name"], ""],
+                  "text-size": 12,
+                  "text-anchor": "center",
+                  "text-allow-overlap": false,
+                },
+                paint: {
+                  "text-color": "#ffffff",
+                  "text-halo-color": "#000000",
+                  "text-halo-width": 1,
+                },
+              });
+            }
+          });
+        }
       }
     });
 
