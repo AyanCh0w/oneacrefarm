@@ -14,6 +14,7 @@ A crop quality tracking and data collection application for One Acre Farm to red
 - **Authentication**: Clerk (Email + Password, Google OAuth)
 - **Google Integration**: googleapis for Sheets/Drive API
 - **Icons**: Hugeicons, Lucide React
+- **Maps**: Mapbox GL JS, react-map-gl
 - **Deployment**: Vercel
 
 ## Commands
@@ -43,6 +44,7 @@ app/
 └── globals.css                  # Tailwind v4 styles
 
 components/
+├── map.tsx                      # Mapbox GL map component
 └── ui/                          # shadcn/ui components
     ├── button.tsx
     ├── card.tsx
@@ -131,6 +133,7 @@ Google Sheets → /api/spreadsheets (list)
 
 Required in `.env.local`:
 - `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL
+- `NEXT_PUBLIC_MAPBOX_TOKEN` - Mapbox public access token
 - Clerk keys (configured via Clerk dashboard)
 
 ## V2 Features (Future)

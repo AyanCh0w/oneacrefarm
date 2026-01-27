@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { UserButton } from "@clerk/clerk-react";
 import { useUser } from "@clerk/nextjs";
 import { Id } from "@/convex/_generated/dataModel";
+import { MapboxMap } from "@/components/map";
 
 interface SheetConfig {
   spreadsheetId: string;
@@ -122,16 +123,20 @@ export default function DashboardPage() {
 
   // Get shared settings from Convex
   const settings = useQuery(api.sheets.getSettings);
-  const updateSettingsSheetNames = useMutation(api.sheets.updateSettingsSheetNames);
+  const updateSettingsSheetNames = useMutation(
+    api.sheets.updateSettingsSheetNames,
+  );
 
   // Derive config from Convex settings
-  const config: SheetConfig | null = settings ? {
-    spreadsheetId: settings.spreadsheetId,
-    spreadsheetName: settings.spreadsheetName,
-    sheetNames: settings.sheetNames,
-    adminUserId: settings.adminUserId,
-    adminEmail: settings.adminEmail,
-  } : null;
+  const config: SheetConfig | null = settings
+    ? {
+        spreadsheetId: settings.spreadsheetId,
+        spreadsheetName: settings.spreadsheetName,
+        sheetNames: settings.sheetNames,
+        adminUserId: settings.adminUserId,
+        adminEmail: settings.adminEmail,
+      }
+    : null;
 
   // Config is loaded when settings query has returned (even if null)
   const configLoaded = settings !== undefined;
@@ -141,15 +146,23 @@ export default function DashboardPage() {
     currentField: "",
     status: "idle",
   });
-  const [selectedLogId, setSelectedLogId] = useState<Id<"qualityLogs"> | null>(null);
+  const [selectedLogId, setSelectedLogId] = useState<Id<"qualityLogs"> | null>(
+    null,
+  );
 
   // New state for dialogs
-  const [showChangeSpreadsheetDialog, setShowChangeSpreadsheetDialog] = useState(false);
+  const [showChangeSpreadsheetDialog, setShowChangeSpreadsheetDialog] =
+    useState(false);
   const [showNoChangesDialog, setShowNoChangesDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
-  const [logToDelete, setLogToDelete] = useState<Id<"qualityLogs"> | null>(null);
-  const [sheetLastModified, setSheetLastModified] = useState<string | null>(null);
+  const [logToDelete, setLogToDelete] = useState<Id<"qualityLogs"> | null>(
+    null,
+  );
+  const [sheetLastModified, setSheetLastModified] = useState<string | null>(
+    null,
+  );
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+  const [isSyncExpanded, setIsSyncExpanded] = useState(false);
 
   // Check if user is admin (using Clerk publicMetadata)
   const isAdmin = user?.publicMetadata?.role === "admin";
@@ -164,14 +177,15 @@ export default function DashboardPage() {
   const deleteQualityLog = useMutation(api.sheets.deleteQualityLog);
   const deleteSheetByField = useMutation(api.sheets.deleteSheetByField);
 
-
   // Fetch spreadsheet last modified time
   const fetchSpreadsheetMetadata = useCallback(async () => {
     if (!config?.spreadsheetId) return;
 
     setIsLoadingMetadata(true);
     try {
-      const response = await fetch(`/api/sheets/${config.spreadsheetId}/metadata`);
+      const response = await fetch(
+        `/api/sheets/${config.spreadsheetId}/metadata`,
+      );
       if (response.ok) {
         const data = await response.json();
         setSheetLastModified(data.modifiedTime);
@@ -216,6 +230,9 @@ export default function DashboardPage() {
       status: "syncing",
     });
 
+    // Auto-expand sync section when syncing starts
+    setIsSyncExpanded(true);
+
     try {
       for (let i = 0; i < allSheets.length; i++) {
         const sheetName = allSheets[i];
@@ -239,7 +256,9 @@ export default function DashboardPage() {
 
           // Check if sheet was not found (renamed or deleted)
           if (response.status === 404 && errorData.code === "SHEET_NOT_FOUND") {
-            console.log(`Sheet "${sheetName}" not found, removing from database...`);
+            console.log(
+              `Sheet "${sheetName}" not found, removing from database...`,
+            );
 
             // Delete the sheet data from the database
             await deleteSheetByField({
@@ -264,7 +283,7 @@ export default function DashboardPage() {
       // Update Convex settings if any sheets were removed
       if (removedSheets.length > 0) {
         const updatedSheetNames = config.sheetNames.filter(
-          (name) => !removedSheets.includes(name)
+          (name) => !removedSheets.includes(name),
         );
         await updateSettingsSheetNames({ sheetNames: updatedSheetNames });
       }
@@ -289,7 +308,13 @@ export default function DashboardPage() {
         error: error instanceof Error ? error.message : "Sync failed",
       }));
     }
-  }, [config, syncProgress.status, fetchSpreadsheetMetadata, deleteSheetByField, updateSettingsSheetNames]);
+  }, [
+    config,
+    syncProgress.status,
+    fetchSpreadsheetMetadata,
+    deleteSheetByField,
+    updateSettingsSheetNames,
+  ]);
 
   // Handle sync button click
   const handleSyncClick = useCallback(() => {
@@ -334,7 +359,8 @@ export default function DashboardPage() {
 
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? "s" : ""} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    if (diffHours < 24)
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
     return date.toLocaleDateString();
   };
@@ -351,7 +377,8 @@ export default function DashboardPage() {
 
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? "s" : ""} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    if (diffHours < 24)
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
     return date.toLocaleDateString();
   };
@@ -375,7 +402,8 @@ export default function DashboardPage() {
         ) : (
           <>
             <p className="text-muted-foreground text-center">
-              No spreadsheet has been configured yet.<br />
+              No spreadsheet has been configured yet.
+              <br />
               Please wait for an admin to set up the spreadsheet.
             </p>
           </>
@@ -410,79 +438,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Sync Section */}
+        {/* Sync Section - Collapsible */}
         <Card>
-          <CardHeader>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => setIsSyncExpanded(!isSyncExpanded)}
+          >
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <CardTitle>Sync Data</CardTitle>
-                {syncProgress.status === "idle" && (
-                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                    {lastSyncTime !== undefined && (
-                      <p>Last synced: {formatLastSync(lastSyncTime)}</p>
-                    )}
-                    {!isLoadingMetadata && sheetLastModified && (
-                      <p>Sheet edited: {formatLastModified(sheetLastModified)}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-              {syncProgress.status === "idle" && (
-                <div className="flex gap-2">
-                  {isAdmin && (
-                    <>
-                      <Button
-                        onClick={() => setShowChangeSpreadsheetDialog(true)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Change Spreadsheet
-                      </Button>
-                      <Button onClick={handleSyncClick} size="sm">
-                        Sync Now
-                      </Button>
-                    </>
-                  )}
-                  {!isAdmin && config?.adminEmail && (
-                    <span className="text-xs text-muted-foreground">
-                      Managed by {config.adminEmail}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {syncProgress.status === "idle" && (
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  {isAdmin
-                    ? "Sync your Google Sheets data to update crops and qualifiers."
-                    : "Data is synced from Google Sheets by the admin."}
-                </p>
-                {config?.sheetNames && config.sheetNames.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {config.sheetNames.map((name) => (
-                      <span
-                        key={name}
-                        className="px-2.5 py-1 bg-muted rounded-md text-xs font-medium"
-                      >
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {syncProgress.status === "syncing" && (
-              <SyncProgressBar progress={syncProgress} />
-            )}
-
-            {syncProgress.status === "complete" && (
-              <div className="flex items-center gap-2 text-green-500">
+              <div className="flex items-center gap-3">
                 <svg
-                  className="w-5 h-5"
+                  className={cn(
+                    "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                    isSyncExpanded && "rotate-90",
+                  )}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -491,22 +459,140 @@ export default function DashboardPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M5 13l4 4L19 7"
+                    d="M9 5l7 7-7 7"
                   />
                 </svg>
-                <span className="font-medium">Sync complete!</span>
+                <div>
+                  <CardTitle className="text-base">Sync Data</CardTitle>
+                  {syncProgress.status === "idle" && !isSyncExpanded && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Last synced: {formatLastSync(lastSyncTime ?? null)}
+                    </p>
+                  )}
+                </div>
               </div>
-            )}
+              {syncProgress.status === "syncing" && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                  </div>
+                  Syncing...
+                </div>
+              )}
+              {syncProgress.status === "complete" && (
+                <span className="text-sm text-green-500 font-medium">
+                  Complete!
+                </span>
+              )}
+            </div>
+          </CardHeader>
+          {isSyncExpanded && (
+            <CardContent className="pt-0">
+              {syncProgress.status === "idle" && (
+                <div className="space-y-4">
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    {lastSyncTime !== undefined && (
+                      <p>Last synced: {formatLastSync(lastSyncTime)}</p>
+                    )}
+                    {!isLoadingMetadata && sheetLastModified && (
+                      <p>
+                        Sheet edited: {formatLastModified(sheetLastModified)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>
+                      {isAdmin
+                        ? "Sync your Google Sheets data to update crops and qualifiers."
+                        : "Data is synced from Google Sheets by the admin."}
+                    </p>
+                    {config?.sheetNames && config.sheetNames.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {config.sheetNames.map((name) => (
+                          <span
+                            key={name}
+                            className="px-2.5 py-1 bg-muted rounded-md text-xs font-medium"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    {isAdmin && (
+                      <>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowChangeSpreadsheetDialog(true);
+                          }}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Change Spreadsheet
+                        </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSyncClick();
+                          }}
+                          size="sm"
+                        >
+                          Sync Now
+                        </Button>
+                      </>
+                    )}
+                    {!isAdmin && config?.adminEmail && (
+                      <span className="text-xs text-muted-foreground">
+                        Managed by {config.adminEmail}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
-            {syncProgress.status === "error" && (
-              <div className="space-y-3">
-                <p className="text-red-500 text-sm">{syncProgress.error}</p>
-                <Button onClick={syncAllSheets} size="sm" variant="outline">
-                  Try Again
-                </Button>
-              </div>
-            )}
-          </CardContent>
+              {syncProgress.status === "syncing" && (
+                <SyncProgressBar progress={syncProgress} />
+              )}
+
+              {syncProgress.status === "complete" && (
+                <div className="flex items-center gap-2 text-green-500">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span className="font-medium">Sync complete!</span>
+                </div>
+              )}
+
+              {syncProgress.status === "error" && (
+                <div className="space-y-3">
+                  <p className="text-red-500 text-sm">{syncProgress.error}</p>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      syncAllSheets();
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          )}
         </Card>
 
         {/* Stats Grid */}
@@ -541,6 +627,23 @@ export default function DashboardPage() {
             loading={uniqueFields === undefined}
           />
         </div>
+
+        {/* Farm Map */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Farm Overview</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-hidden rounded-b-lg">
+            <MapboxMap
+              className="h-[350px] md:h-[400px]"
+              style="mapbox://styles/ayanchow/cmkwthf8e005501qu4jcae74l"
+              initialCenter={[-77.451251, 39.162552]}
+              initialZoom={17}
+              initialBearing={-67.2}
+              initialPitch={0}
+            />
+          </CardContent>
+        </Card>
 
         {/* Recent Logs */}
         {qualityLogs && qualityLogs.length > 0 && (
@@ -587,7 +690,7 @@ export default function DashboardPage() {
                       size="sm"
                       className={cn(
                         "ml-2 text-destructive hover:text-destructive hover:bg-destructive/10",
-                        !isAdmin && "opacity-40 cursor-not-allowed"
+                        !isAdmin && "opacity-40 cursor-not-allowed",
                       )}
                       disabled={!isAdmin}
                       onClick={(e) => {
@@ -621,7 +724,10 @@ export default function DashboardPage() {
         )}
 
         {/* Quality Log Detail Dialog */}
-        <Dialog open={selectedLogId !== null} onOpenChange={(open) => !open && setSelectedLogId(null)}>
+        <Dialog
+          open={selectedLogId !== null}
+          onOpenChange={(open) => !open && setSelectedLogId(null)}
+        >
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             {selectedLog && (
               <>
@@ -635,7 +741,9 @@ export default function DashboardPage() {
                     )}
                   </DialogTitle>
                   <DialogDescription>
-                    Logged on {new Date(selectedLog.assessmentDate).toLocaleDateString()} at{" "}
+                    Logged on{" "}
+                    {new Date(selectedLog.assessmentDate).toLocaleDateString()}{" "}
+                    at{" "}
                     {new Date(selectedLog.assessmentDate).toLocaleTimeString()}
                   </DialogDescription>
                 </DialogHeader>
@@ -644,27 +752,43 @@ export default function DashboardPage() {
                   {/* Location Info */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-muted/50 rounded-lg p-3">
-                      <span className="text-muted-foreground block text-xs mb-1">Field</span>
+                      <span className="text-muted-foreground block text-xs mb-1">
+                        Field
+                      </span>
                       <span className="font-medium">{selectedLog.field}</span>
                     </div>
                     <div className="bg-muted/50 rounded-lg p-3">
-                      <span className="text-muted-foreground block text-xs mb-1">Bed</span>
-                      <span className="font-medium">{selectedLog.bed || "—"}</span>
+                      <span className="text-muted-foreground block text-xs mb-1">
+                        Bed
+                      </span>
+                      <span className="font-medium">
+                        {selectedLog.bed || "—"}
+                      </span>
                     </div>
                     <div className="bg-muted/50 rounded-lg p-3">
-                      <span className="text-muted-foreground block text-xs mb-1">Planted</span>
-                      <span className="font-medium">{selectedLog.datePlanted || "—"}</span>
+                      <span className="text-muted-foreground block text-xs mb-1">
+                        Planted
+                      </span>
+                      <span className="font-medium">
+                        {selectedLog.datePlanted || "—"}
+                      </span>
                     </div>
                     <div className="bg-muted/50 rounded-lg p-3">
-                      <span className="text-muted-foreground block text-xs mb-1">Trays</span>
-                      <span className="font-medium">{selectedLog.trays || "—"}</span>
+                      <span className="text-muted-foreground block text-xs mb-1">
+                        Trays
+                      </span>
+                      <span className="font-medium">
+                        {selectedLog.trays || "—"}
+                      </span>
                     </div>
                   </div>
 
                   {/* Planting Notes */}
                   {selectedLog.plantingNotes && (
                     <div>
-                      <h3 className="text-sm font-semibold mb-2">Planting Notes</h3>
+                      <h3 className="text-sm font-semibold mb-2">
+                        Planting Notes
+                      </h3>
                       <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
                         {selectedLog.plantingNotes}
                       </p>
@@ -673,11 +797,18 @@ export default function DashboardPage() {
 
                   {/* Assessment Responses */}
                   <div>
-                    <h3 className="text-sm font-semibold mb-3">Assessment Responses</h3>
+                    <h3 className="text-sm font-semibold mb-3">
+                      Assessment Responses
+                    </h3>
                     <div className="space-y-3">
                       {selectedLog.responses.map((response, index) => (
-                        <div key={index} className="border border-border rounded-lg p-3">
-                          <p className="text-sm font-medium mb-1">{response.question}</p>
+                        <div
+                          key={index}
+                          className="border border-border rounded-lg p-3"
+                        >
+                          <p className="text-sm font-medium mb-1">
+                            {response.question}
+                          </p>
                           <p className="text-sm text-muted-foreground bg-primary/10 rounded px-2 py-1 inline-block">
                             {response.answer}
                           </p>
@@ -689,7 +820,9 @@ export default function DashboardPage() {
                   {/* Log Notes */}
                   {selectedLog.logNotes && (
                     <div>
-                      <h3 className="text-sm font-semibold mb-2">Additional Notes</h3>
+                      <h3 className="text-sm font-semibold mb-2">
+                        Additional Notes
+                      </h3>
                       <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
                         {selectedLog.logNotes}
                       </p>
@@ -702,16 +835,24 @@ export default function DashboardPage() {
         </Dialog>
 
         {/* Change Spreadsheet Confirmation Dialog */}
-        <Dialog open={showChangeSpreadsheetDialog} onOpenChange={setShowChangeSpreadsheetDialog}>
+        <Dialog
+          open={showChangeSpreadsheetDialog}
+          onOpenChange={setShowChangeSpreadsheetDialog}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Change Spreadsheet?</DialogTitle>
               <DialogDescription>
-                Are you sure you want to change your connected spreadsheet? You will be redirected to the setup page to connect a different spreadsheet.
+                Are you sure you want to change your connected spreadsheet? You
+                will be redirected to the setup page to connect a different
+                spreadsheet.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowChangeSpreadsheetDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowChangeSpreadsheetDialog(false)}
+              >
                 Cancel
               </Button>
               <Button onClick={handleChangeSpreadsheet}>
@@ -722,22 +863,31 @@ export default function DashboardPage() {
         </Dialog>
 
         {/* No Changes Sync Confirmation Dialog */}
-        <Dialog open={showNoChangesDialog} onOpenChange={setShowNoChangesDialog}>
+        <Dialog
+          open={showNoChangesDialog}
+          onOpenChange={setShowNoChangesDialog}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>No Changes Detected</DialogTitle>
               <DialogDescription>
-                The spreadsheet has not been modified since your last sync. Do you still want to sync?
+                The spreadsheet has not been modified since your last sync. Do
+                you still want to sync?
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowNoChangesDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowNoChangesDialog(false)}
+              >
                 Cancel
               </Button>
-              <Button onClick={() => {
-                setShowNoChangesDialog(false);
-                syncAllSheets();
-              }}>
+              <Button
+                onClick={() => {
+                  setShowNoChangesDialog(false);
+                  syncAllSheets();
+                }}
+              >
                 Sync Anyway
               </Button>
             </DialogFooter>
@@ -745,19 +895,26 @@ export default function DashboardPage() {
         </Dialog>
 
         {/* Delete Quality Log Confirmation Dialog */}
-        <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+        <Dialog
+          open={showDeleteConfirmDialog}
+          onOpenChange={setShowDeleteConfirmDialog}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete Quality Log?</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete this quality log? This action cannot be undone.
+                Are you sure you want to delete this quality log? This action
+                cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setShowDeleteConfirmDialog(false);
-                setLogToDelete(null);
-              }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteConfirmDialog(false);
+                  setLogToDelete(null);
+                }}
+              >
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleDeleteLog}>

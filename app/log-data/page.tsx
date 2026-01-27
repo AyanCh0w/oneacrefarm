@@ -14,6 +14,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { MapboxMap } from "@/components/map";
 
 // Types
 interface Crop {
@@ -50,9 +51,7 @@ function getBaseCropName(cropName: string): string {
 // Skeleton components
 function Skeleton({ className }: { className?: string }) {
   return (
-    <div
-      className={cn("animate-pulse rounded-md bg-muted/50", className)}
-    />
+    <div className={cn("animate-pulse rounded-md bg-muted/50", className)} />
   );
 }
 
@@ -76,7 +75,7 @@ function ViewToggle({
           "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
           viewMode === "list"
             ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         <svg
@@ -100,7 +99,7 @@ function ViewToggle({
           "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
           viewMode === "map"
             ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         <svg
@@ -179,7 +178,7 @@ function FieldButton({
         "flex flex-col items-start justify-center min-h-[6rem]",
         isSelected
           ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-          : "border-border bg-card"
+          : "border-border bg-card",
       )}
     >
       <span className="font-semibold text-lg leading-tight">{field}</span>
@@ -208,7 +207,7 @@ function CropCard({
         "hover:border-primary/50 hover:bg-primary/5 active:scale-[0.98]",
         isSelected
           ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-          : "border-border bg-card"
+          : "border-border bg-card",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -224,16 +223,21 @@ function CropCard({
       </div>
       <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <div className="text-muted-foreground">
-          Date: <span className="text-foreground font-medium">{crop.date || "—"}</span>
+          Date:{" "}
+          <span className="text-foreground font-medium">
+            {crop.date || "—"}
+          </span>
         </div>
         {crop.trays && (
           <div className="text-muted-foreground">
-            Trays: <span className="text-foreground font-medium">{crop.trays}</span>
+            Trays:{" "}
+            <span className="text-foreground font-medium">{crop.trays}</span>
           </div>
         )}
         {crop.rows && (
           <div className="text-muted-foreground">
-            Rows: <span className="text-foreground font-medium">{crop.rows}</span>
+            Rows:{" "}
+            <span className="text-foreground font-medium">{crop.rows}</span>
           </div>
         )}
       </div>
@@ -265,7 +269,7 @@ function OptionButton({
         "min-h-[4rem] flex items-center justify-center",
         isSelected
           ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
+          : "border-border bg-card hover:border-primary/50 hover:bg-primary/5",
       )}
     >
       {option}
@@ -282,7 +286,10 @@ function DataEntryForm({
 }: {
   qualifier: Qualifier;
   selectedCrop: Crop;
-  onSubmit: (responses: { question: string; answer: string }[], notes?: string) => void;
+  onSubmit: (
+    responses: { question: string; answer: string }[],
+    notes?: string,
+  ) => void;
   onBack: () => void;
 }) {
   const [responses, setResponses] = useState<Record<string, string>>({});
@@ -297,10 +304,12 @@ function DataEntryForm({
   };
 
   const handleSubmit = () => {
-    const formattedResponses = Object.entries(responses).map(([question, answer]) => ({
-      question,
-      answer,
-    }));
+    const formattedResponses = Object.entries(responses).map(
+      ([question, answer]) => ({
+        question,
+        answer,
+      }),
+    );
     onSubmit(formattedResponses, notes || undefined);
   };
 
@@ -334,7 +343,9 @@ function DataEntryForm({
               <span className="font-medium">{selectedCrop.bed || "—"}</span>
             </div>
             <div className="bg-muted/50 rounded-lg p-2">
-              <span className="text-muted-foreground block text-xs">Planted</span>
+              <span className="text-muted-foreground block text-xs">
+                Planted
+              </span>
               <span className="font-medium">{selectedCrop.date || "—"}</span>
             </div>
             <div className="bg-muted/50 rounded-lg p-2">
@@ -361,7 +372,7 @@ function DataEntryForm({
               key={index}
               className={cn(
                 "w-2 h-2 rounded-full transition-all",
-                responses[a.name] ? "bg-primary" : "bg-muted"
+                responses[a.name] ? "bg-primary" : "bg-muted",
               )}
             />
           ))}
@@ -388,7 +399,7 @@ function DataEntryForm({
                       "transition-all duration-200 active:scale-[0.97]",
                       responses[assessment.name] === option
                         ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
+                        : "border-border bg-card hover:border-primary/50 hover:bg-primary/5",
                     )}
                   >
                     {option}
@@ -423,7 +434,9 @@ function DataEntryForm({
         disabled={!allAnswered}
         className="w-full h-14 text-lg"
       >
-        {allAnswered ? "Submit Log" : `Answer all questions (${answeredCount}/${assessments.length})`}
+        {allAnswered
+          ? "Submit Log"
+          : `Answer all questions (${answeredCount}/${assessments.length})`}
       </Button>
     </div>
   );
@@ -464,7 +477,11 @@ function SuccessScreen({
         <Button onClick={onLogAnother} className="flex-1 h-12">
           Log Another
         </Button>
-        <Button variant="outline" onClick={onGoToDashboard} className="flex-1 h-12">
+        <Button
+          variant="outline"
+          onClick={onGoToDashboard}
+          className="flex-1 h-12"
+        >
           Go to Dashboard
         </Button>
       </div>
@@ -487,9 +504,10 @@ export default function LogDataPage() {
   const createQualityLog = useMutation(api.sheets.createQualityLog);
 
   // Get crops for selected field
-  const fieldCrops = selectedField && crops
-    ? crops.filter((c) => c.field === selectedField)
-    : [];
+  const fieldCrops =
+    selectedField && crops
+      ? crops.filter((c) => c.field === selectedField)
+      : [];
 
   // Count crops per field
   const cropCountByField: Record<string, number> = {};
@@ -516,12 +534,13 @@ export default function LogDataPage() {
 
   // Get the qualifier definition for the selected crop
   // Match by base crop name (before the colon)
-  const selectedQualifier = selectedCrop && qualifiers
-    ? qualifiers.find((q) => {
-        const baseCropName = getBaseCropName(selectedCrop.crop);
-        return q.name.toLowerCase() === baseCropName.toLowerCase();
-      })
-    : null;
+  const selectedQualifier =
+    selectedCrop && qualifiers
+      ? qualifiers.find((q) => {
+          const baseCropName = getBaseCropName(selectedCrop.crop);
+          return q.name.toLowerCase() === baseCropName.toLowerCase();
+        })
+      : null;
 
   // Handle field selection
   const handleFieldSelect = (field: string) => {
@@ -538,7 +557,7 @@ export default function LogDataPage() {
   // Handle form submission
   const handleSubmit = async (
     responses: { question: string; answer: string }[],
-    notes?: string
+    notes?: string,
   ) => {
     if (!selectedCrop) return;
 
@@ -601,7 +620,11 @@ export default function LogDataPage() {
               {step === "success" && "Log submitted"}
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/dashboard")}
+          >
             Dashboard
           </Button>
         </div>
@@ -612,7 +635,9 @@ export default function LogDataPage() {
             <p className="text-muted-foreground mb-4">
               No crops synced yet. Sync your data from the dashboard first.
             </p>
-            <Button onClick={() => router.push("/dashboard")}>Go to Dashboard</Button>
+            <Button onClick={() => router.push("/dashboard")}>
+              Go to Dashboard
+            </Button>
           </Card>
         )}
 
@@ -627,33 +652,25 @@ export default function LogDataPage() {
               <ViewToggle viewMode={viewMode} onViewChange={setViewMode} />
             </div>
 
-            {/* Map View Placeholder */}
+            {/* Map View */}
             {viewMode === "map" && (
-              <Card className="p-8 text-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                    <svg
-                      className="w-8 h-8 text-muted-foreground"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium">Map View Coming Soon</p>
-                    <p className="text-sm text-muted-foreground">
-                      View your fields on an interactive map
-                    </p>
-                  </div>
-                </div>
-              </Card>
+              <div className="space-y-4">
+                <Card className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <MapboxMap
+                      className="h-[400px] md:h-[500px]"
+                      style="mapbox://styles/ayanchow/cmkwthf8e005501qu4jcae74l"
+                      initialCenter={[-77.451251, 39.162552]}
+                      initialZoom={17}
+                      initialBearing={-67.2}
+                      initialPitch={0}
+                    />
+                  </CardContent>
+                </Card>
+                <p className="text-sm text-muted-foreground text-center">
+                  Tap on a field marker to select it for logging
+                </p>
+              </div>
             )}
 
             {/* List View - Grid Layout with Categorization */}
@@ -719,7 +736,12 @@ export default function LogDataPage() {
         {step === "select-crop" && selectedField && (
           <div className="space-y-4">
             {/* Back button */}
-            <Button variant="ghost" size="sm" onClick={handleBackToFields} className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToFields}
+              className="mb-2"
+            >
               <svg
                 className="w-4 h-4 mr-1"
                 fill="none"
@@ -740,7 +762,8 @@ export default function LogDataPage() {
             <div className="bg-primary/10 rounded-xl p-4 mb-4">
               <h2 className="font-semibold text-lg">{selectedField}</h2>
               <p className="text-sm text-muted-foreground">
-                {fieldCrops.length} crop{fieldCrops.length !== 1 ? "s" : ""} available
+                {fieldCrops.length} crop{fieldCrops.length !== 1 ? "s" : ""}{" "}
+                available
               </p>
             </div>
 
@@ -757,7 +780,9 @@ export default function LogDataPage() {
                 ))
               ) : (
                 <Card className="p-8 text-center">
-                  <p className="text-muted-foreground">No crops in this field.</p>
+                  <p className="text-muted-foreground">
+                    No crops in this field.
+                  </p>
                 </Card>
               )}
             </div>
@@ -779,12 +804,15 @@ export default function LogDataPage() {
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground mb-4">
-                  No assessment questions found for &quot;{getBaseCropName(selectedCrop.crop)}&quot;.
+                  No assessment questions found for &quot;
+                  {getBaseCropName(selectedCrop.crop)}&quot;.
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
                   Make sure this crop is defined in your Qualifiers sheet.
                 </p>
-                <Button onClick={handleBackToCrops}>Select Different Crop</Button>
+                <Button onClick={handleBackToCrops}>
+                  Select Different Crop
+                </Button>
               </Card>
             )}
           </>
