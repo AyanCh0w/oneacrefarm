@@ -4,6 +4,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { GoogleSheetsClient } from "@/lib/google-sheets";
 import { parseQualifiersSheet } from "@/lib/parse-qualifiers";
+import { isAdmin } from "@/lib/auth";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -68,6 +69,15 @@ export async function POST(
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only admins can sync spreadsheet data
+    const admin = await isAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Admin access required to sync data" },
+        { status: 403 }
+      );
     }
 
     const { id: spreadsheetId } = await params;
