@@ -17,6 +17,9 @@ interface MapboxMapProps {
   initialZoom?: number;
   initialBearing?: number;
   initialPitch?: number;
+  minZoom?: number;
+  maxZoom?: number;
+  maxBounds?: [[number, number], [number, number]]; // [[sw_lng, sw_lat], [ne_lng, ne_lat]]
   style?: string;
   onMapLoad?: (map: mapboxgl.Map) => void;
   onFeaturesLoad?: (features: MapFeature[]) => void;
@@ -35,9 +38,15 @@ interface MapboxMapProps {
 export function MapboxMap({
   className,
   initialCenter = [-77.451251, 39.162552],
-  initialZoom = 16,
+  initialZoom = 17,
   initialBearing = -67.2,
   initialPitch = 0,
+  minZoom = 16.5,
+  maxZoom = 19,
+  maxBounds = [
+    [-77.454, 39.1605], // Southwest
+    [-77.4485, 39.1645], // Northeast
+  ],
   style = "mapbox://styles/ayanchow/cmkwthf8e005501qu4jcae74l",
   onMapLoad,
   onFeaturesLoad,
@@ -74,6 +83,9 @@ export function MapboxMap({
       zoom: initialZoom,
       bearing: initialBearing,
       pitch: initialPitch,
+      minZoom,
+      maxZoom,
+      maxBounds,
     });
 
     //map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
@@ -114,7 +126,7 @@ export function MapboxMap({
         if (mapStyle?.layers) {
           // Find fill layers that might be fields
           const fillLayers = mapStyle.layers.filter(
-            (layer) => layer.type === "fill" && layer.source
+            (layer) => layer.type === "fill" && layer.source,
           );
 
           fillLayers.forEach((layer) => {
@@ -123,14 +135,21 @@ export function MapboxMap({
 
             // Check if label layer already exists
             if (!map.current!.getLayer(labelLayerId)) {
-              const sourceLayer = (layer as Record<string, unknown>)["source-layer"] as string | undefined;
+              const sourceLayer = (layer as Record<string, unknown>)[
+                "source-layer"
+              ] as string | undefined;
               map.current!.addLayer({
                 id: labelLayerId,
                 type: "symbol",
                 source: sourceId,
                 ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
                 layout: {
-                  "text-field": ["coalesce", ["get", "name"], ["get", "Name"], ""],
+                  "text-field": [
+                    "coalesce",
+                    ["get", "name"],
+                    ["get", "Name"],
+                    "",
+                  ],
                   "text-size": 12,
                   "text-anchor": "center",
                   "text-allow-overlap": false,
