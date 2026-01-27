@@ -70,30 +70,6 @@ function ViewToggle({
   return (
     <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
       <button
-        onClick={() => onViewChange("list")}
-        className={cn(
-          "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-          viewMode === "list"
-            ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-          />
-        </svg>
-        List
-      </button>
-      <button
         onClick={() => onViewChange("map")}
         className={cn(
           "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
@@ -116,6 +92,30 @@ function ViewToggle({
           />
         </svg>
         Map
+      </button>
+      <button
+        onClick={() => onViewChange("list")}
+        className={cn(
+          "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
+          viewMode === "list"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+          />
+        </svg>
+        List
       </button>
     </div>
   );
@@ -495,8 +495,10 @@ export default function LogDataPage() {
   const [step, setStep] = useState<Step>("select-field");
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [selectedFeature, setSelectedFeature] = useState<MapFeature | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("map");
+  const [selectedFeature, setSelectedFeature] = useState<MapFeature | null>(
+    null,
+  );
 
   // Handle feature click - just show the data
   const handleFeatureClick = (feature: MapFeature) => {
@@ -677,57 +679,77 @@ export default function LogDataPage() {
                 </Card>
 
                 {/* Show clicked field data */}
-                {selectedFeature ? (() => {
-                  const name = String(selectedFeature.properties.name || selectedFeature.properties.Name || "Field");
-                  const description = selectedFeature.properties.description || selectedFeature.properties.Description;
-
-                  // Find similar fields from the database
-                  const similarFields = uniqueFields?.filter((field) => {
-                    const fieldLower = field.toLowerCase();
-                    const nameLower = name.toLowerCase();
-                    // Match if: starts with same letter, contains the name, or name contains field
-                    return (
-                      fieldLower[0] === nameLower[0] ||
-                      fieldLower.includes(nameLower) ||
-                      nameLower.includes(fieldLower.split(":")[0]) ||
-                      nameLower.split(" ").some((word) => fieldLower.includes(word) && word.length > 1)
+                {selectedFeature ? (
+                  (() => {
+                    const name = String(
+                      selectedFeature.properties.name ||
+                        selectedFeature.properties.Name ||
+                        "Field",
                     );
-                  }) || [];
+                    const description =
+                      selectedFeature.properties.description ||
+                      selectedFeature.properties.Description;
 
-                  return (
-                    <div className="space-y-4">
-                      <div className="p-4 rounded-lg border border-primary bg-primary/10">
-                        <p className="text-sm text-muted-foreground">Selected from map</p>
-                        <p className="font-semibold text-lg">{name}</p>
-                        {description != null && (
-                          <p className="text-muted-foreground mt-1">
-                            {String(description)}
+                    // Find similar fields from the database
+                    const similarFields =
+                      uniqueFields?.filter((field) => {
+                        const fieldLower = field.toLowerCase();
+                        const nameLower = name.toLowerCase();
+                        // Match if: starts with same letter, contains the name, or name contains field
+                        return (
+                          fieldLower[0] === nameLower[0] ||
+                          fieldLower.includes(nameLower) ||
+                          nameLower.includes(fieldLower.split(":")[0]) ||
+                          nameLower
+                            .split(" ")
+                            .some(
+                              (word) =>
+                                fieldLower.includes(word) && word.length > 1,
+                            )
+                        );
+                      }) || [];
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-lg border border-primary bg-primary/10">
+                          <p className="text-sm text-muted-foreground">
+                            Selected from map
                           </p>
+                          <p className="font-semibold text-lg">{name}</p>
+                          {description != null && (
+                            <p className="text-muted-foreground mt-1">
+                              {String(description)}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Similar fields from database */}
+                        {similarFields.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                              Matching fields ({similarFields.length})
+                            </p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              {similarFields.map((field) => (
+                                <FieldButton
+                                  key={field}
+                                  field={
+                                    field.includes(":")
+                                      ? field.split(":")[1]?.trim() || field
+                                      : field
+                                  }
+                                  cropCount={cropCountByField[field] || 0}
+                                  onSelect={() => handleFieldSelect(field)}
+                                  isSelected={selectedField === field}
+                                />
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
-
-                      {/* Similar fields from database */}
-                      {similarFields.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">
-                            Matching fields ({similarFields.length})
-                          </p>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {similarFields.map((field) => (
-                              <FieldButton
-                                key={field}
-                                field={field.includes(":") ? field.split(":")[1]?.trim() || field : field}
-                                cropCount={cropCountByField[field] || 0}
-                                onSelect={() => handleFieldSelect(field)}
-                                isSelected={selectedField === field}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })() : (
+                    );
+                  })()
+                ) : (
                   <p className="text-sm text-muted-foreground text-center">
                     Tap on a field to see its details
                   </p>
