@@ -2,9 +2,6 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -47,9 +44,6 @@ interface FieldInfo {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, isLoaded: userLoaded } = useUser();
-  const setSettings = useMutation(api.sheets.setSettings);
-
   const [spreadsheets, setSpreadsheets] = useState<SpreadsheetInfo[]>([]);
   const [selectedSpreadsheet, setSelectedSpreadsheet] =
     useState<SpreadsheetInfo | null>(null);
@@ -66,16 +60,6 @@ export default function OnboardingPage() {
   } | null>(null);
   const [syncedFields, setSyncedFields] = useState<string[]>([]);
   const [error, setError] = useState("");
-
-  // Check if user is admin
-  const isAdmin = user?.publicMetadata?.role === "admin";
-
-  // Redirect non-admins to dashboard
-  useEffect(() => {
-    if (userLoaded && !isAdmin) {
-      router.push("/dashboard");
-    }
-  }, [userLoaded, isAdmin, router]);
 
   // Filter and sort spreadsheets based on search query (most recently edited first)
   const filteredSpreadsheets = useMemo(() => {
@@ -202,68 +186,23 @@ export default function OnboardingPage() {
     setSyncProgress(null);
   };
 
-  const saveAndContinue = async () => {
+  const saveAndContinue = () => {
     if (!selectedSpreadsheet || syncedFields.length === 0) {
       setError("Please select a spreadsheet and sync the fields first");
       return;
     }
 
-    if (!user) {
-      setError("You must be logged in");
-      return;
-    }
-
-    try {
-      // Save to Convex (shared for all users)
-      await setSettings({
+    localStorage.setItem(
+      "cropLogger_sheetConfig",
+      JSON.stringify({
         spreadsheetId: selectedSpreadsheet.id,
         spreadsheetName: selectedSpreadsheet.name,
         sheetNames: syncedFields,
-        adminUserId: user.id,
-        adminEmail: user.primaryEmailAddress?.emailAddress || "",
-      });
+      })
+    );
 
-      // Also keep in localStorage for backward compatibility during migration
-      localStorage.setItem(
-        "cropLogger_sheetConfig",
-        JSON.stringify({
-          spreadsheetId: selectedSpreadsheet.id,
-          spreadsheetName: selectedSpreadsheet.name,
-          sheetNames: syncedFields,
-        })
-      );
-
-      router.push("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
-    }
+    router.push("/dashboard");
   };
-
-  // Show loading while checking user status
-  if (!userLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
-  // Show access denied for non-admins
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 gap-4">
-        <Card className="w-full max-w-md p-8 text-center space-y-4">
-          <h1 className="text-2xl font-bold text-destructive">Admin Only</h1>
-          <p className="text-muted-foreground">
-            Only administrators can configure the spreadsheet. Please contact your admin if you need changes.
-          </p>
-          <Button onClick={() => router.push("/dashboard")} variant="outline">
-            Back to Dashboard
-          </Button>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-8">
@@ -271,10 +210,7 @@ export default function OnboardingPage() {
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold">Setup Crop Logger</h1>
           <p className="text-lg text-muted-foreground">
-            Select the Google Sheet for your team
-          </p>
-          <p className="text-sm text-amber-500">
-            Admin only: This spreadsheet will be shared with all users
+            Select your Google Sheet to get started
           </p>
         </div>
 

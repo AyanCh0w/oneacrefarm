@@ -2,16 +2,6 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Global app settings - only one record for shared spreadsheet config
-  settings: defineTable({
-    spreadsheetId: v.string(),
-    spreadsheetName: v.string(),
-    sheetNames: v.array(v.string()),
-    adminUserId: v.string(), // Clerk user ID of the admin who set this up
-    adminEmail: v.string(), // Email of the admin (for display)
-    lastUpdated: v.number(),
-  }),
-
   sheets: defineTable({
     spreadsheetId: v.string(),
     range: v.string(),
