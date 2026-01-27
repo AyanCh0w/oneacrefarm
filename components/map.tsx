@@ -4,6 +4,13 @@ import { useRef, useEffect, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { cn } from "@/lib/utils";
 
+export interface MapFeature {
+  id: string | number | undefined;
+  layerId: string;
+  properties: Record<string, unknown>;
+  geometry: GeoJSON.Geometry;
+}
+
 interface MapboxMapProps {
   className?: string;
   initialCenter?: [number, number];
@@ -12,6 +19,10 @@ interface MapboxMapProps {
   initialPitch?: number;
   style?: string;
   onMapLoad?: (map: mapboxgl.Map) => void;
+  onFeaturesLoad?: (features: MapFeature[]) => void;
+  onFeatureClick?: (feature: MapFeature) => void;
+  interactiveLayers?: string[];
+  autoDiscoverLayers?: boolean;
   markers?: Array<{
     id: string;
     coordinates: [number, number];
@@ -28,6 +39,10 @@ export function MapboxMap({
   initialPitch = 0,
   style = "mapbox://styles/ayanchow/cmkwthf8e005501qu4jcae74l",
   onMapLoad,
+  onFeaturesLoad,
+  onFeatureClick,
+  interactiveLayers = [],
+  autoDiscoverLayers = false,
   markers = [],
 }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -72,6 +87,23 @@ export function MapboxMap({
       setMapLoaded(true);
       if (onMapLoad && map.current) {
         onMapLoad(map.current);
+      }
+
+      // Click anywhere on map to get features at that point
+      if (onFeatureClick && map.current) {
+        map.current.on("click", (e) => {
+          const features = map.current!.queryRenderedFeatures(e.point);
+          if (features.length > 0) {
+            const feature = features[0];
+            console.log("Clicked feature:", feature.properties);
+            onFeatureClick({
+              id: feature.id,
+              layerId: feature.layer?.id || "",
+              properties: feature.properties || {},
+              geometry: feature.geometry,
+            });
+          }
+        });
       }
     });
 

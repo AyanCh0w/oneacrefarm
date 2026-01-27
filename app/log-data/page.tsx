@@ -14,7 +14,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { MapboxMap } from "@/components/map";
+import { MapboxMap, MapFeature } from "@/components/map";
 
 // Types
 interface Crop {
@@ -496,6 +496,12 @@ export default function LogDataPage() {
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [selectedFeature, setSelectedFeature] = useState<MapFeature | null>(null);
+
+  // Handle feature click - just show the data
+  const handleFeatureClick = (feature: MapFeature) => {
+    setSelectedFeature(feature);
+  };
 
   // Convex queries
   const crops = useQuery(api.sheets.getAllCrops);
@@ -664,12 +670,67 @@ export default function LogDataPage() {
                       initialZoom={17}
                       initialBearing={-67.2}
                       initialPitch={0}
+                      onFeatureClick={handleFeatureClick}
                     />
                   </CardContent>
                 </Card>
-                <p className="text-sm text-muted-foreground text-center">
-                  Tap on a field marker to select it for logging
-                </p>
+
+                {/* Show clicked field data */}
+                {selectedFeature ? (() => {
+                  const name = String(selectedFeature.properties.name || selectedFeature.properties.Name || "Field");
+                  const description = selectedFeature.properties.description || selectedFeature.properties.Description;
+
+                  // Find similar fields from the database
+                  const similarFields = uniqueFields?.filter((field) => {
+                    const fieldLower = field.toLowerCase();
+                    const nameLower = name.toLowerCase();
+                    // Match if: starts with same letter, contains the name, or name contains field
+                    return (
+                      fieldLower[0] === nameLower[0] ||
+                      fieldLower.includes(nameLower) ||
+                      nameLower.includes(fieldLower.split(":")[0]) ||
+                      nameLower.split(" ").some((word) => fieldLower.includes(word) && word.length > 1)
+                    );
+                  }) || [];
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-lg border border-primary bg-primary/10">
+                        <p className="text-sm text-muted-foreground">Selected from map</p>
+                        <p className="font-semibold text-lg">{name}</p>
+                        {description != null && (
+                          <p className="text-muted-foreground mt-1">
+                            {String(description)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Similar fields from database */}
+                      {similarFields.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            Matching fields ({similarFields.length})
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {similarFields.map((field) => (
+                              <FieldButton
+                                key={field}
+                                field={field.includes(":") ? field.split(":")[1]?.trim() || field : field}
+                                cropCount={cropCountByField[field] || 0}
+                                onSelect={() => handleFieldSelect(field)}
+                                isSelected={selectedField === field}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })() : (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Tap on a field to see its details
+                  </p>
+                )}
               </div>
             )}
 
