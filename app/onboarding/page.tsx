@@ -151,11 +151,14 @@ export default function OnboardingPage() {
     setSyncing(true);
     const synced: string[] = [];
 
+    // Total includes all fields plus the Qualifiers sheet
+    const totalSheets = fields.length + 1;
+
     for (let i = 0; i < fields.length; i++) {
       const field = fields[i];
       setSyncProgress({
         current: i + 1,
-        total: fields.length,
+        total: totalSheets,
         currentField: field.title,
       });
 
@@ -180,6 +183,32 @@ export default function OnboardingPage() {
       } catch (err) {
         console.error(`Error syncing ${field.title}:`, err);
       }
+    }
+
+    // Sync Qualifiers sheet last (required for log data page)
+    setSyncProgress({
+      current: totalSheets,
+      total: totalSheets,
+      currentField: "Qualifiers",
+    });
+
+    try {
+      const response = await fetch(
+        `/api/sheets/${selectedSpreadsheet.id}/sync`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sheetName: "Qualifiers" }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Failed to sync Qualifiers:", data.error);
+      }
+    } catch (err) {
+      console.error("Error syncing Qualifiers:", err);
     }
 
     setSyncing(false);
