@@ -23,6 +23,8 @@ interface SheetConfig {
   spreadsheetId: string;
   spreadsheetName: string;
   sheetNames: string[];
+  adminUserId?: string;
+  adminEmail?: string;
 }
 
 interface SyncProgress {
@@ -117,8 +119,22 @@ function StatsCard({
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useUser();
-  const [config, setConfig] = useState<SheetConfig | null>(null);
-  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Get shared settings from Convex
+  const settings = useQuery(api.sheets.getSettings);
+  const updateSettingsSheetNames = useMutation(api.sheets.updateSettingsSheetNames);
+
+  // Derive config from Convex settings
+  const config: SheetConfig | null = settings ? {
+    spreadsheetId: settings.spreadsheetId,
+    spreadsheetName: settings.spreadsheetName,
+    sheetNames: settings.sheetNames,
+    adminUserId: settings.adminUserId,
+    adminEmail: settings.adminEmail,
+  } : null;
+
+  // Config is loaded when settings query has returned (even if null)
+  const configLoaded = settings !== undefined;
   const [syncProgress, setSyncProgress] = useState<SyncProgress>({
     current: 0,
     total: 0,
@@ -148,15 +164,6 @@ export default function DashboardPage() {
   const deleteQualityLog = useMutation(api.sheets.deleteQualityLog);
   const deleteSheetByField = useMutation(api.sheets.deleteSheetByField);
 
-  // Load config from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem("cropLogger_sheetConfig");
-    if (stored) {
-      const parsed = JSON.parse(stored) as SheetConfig;
-      setConfig(parsed);
-    }
-    setConfigLoaded(true);
-  }, []);
 
   // Fetch spreadsheet last modified time
   const fetchSpreadsheetMetadata = useCallback(async () => {
@@ -254,17 +261,12 @@ export default function DashboardPage() {
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
-      // Update local config if any sheets were removed
+      // Update Convex settings if any sheets were removed
       if (removedSheets.length > 0) {
         const updatedSheetNames = config.sheetNames.filter(
           (name) => !removedSheets.includes(name)
         );
-        const updatedConfig = {
-          ...config,
-          sheetNames: updatedSheetNames,
-        };
-        localStorage.setItem("cropLogger_sheetConfig", JSON.stringify(updatedConfig));
-        setConfig(updatedConfig);
+        await updateSettingsSheetNames({ sheetNames: updatedSheetNames });
       }
 
       setSyncProgress((prev) => ({
@@ -287,7 +289,7 @@ export default function DashboardPage() {
         error: error instanceof Error ? error.message : "Sync failed",
       }));
     }
-  }, [config, syncProgress.status, fetchSpreadsheetMetadata, deleteSheetByField]);
+  }, [config, syncProgress.status, fetchSpreadsheetMetadata, deleteSheetByField, updateSettingsSheetNames]);
 
   // Handle sync button click
   const handleSyncClick = useCallback(() => {
@@ -359,14 +361,25 @@ export default function DashboardPage() {
     ? [...new Set(crops.map((c) => c.crop))].length
     : 0;
 
-  // No config - show setup prompt
+  // No config - show setup prompt (admin) or waiting message (non-admin)
   if (configLoaded && !config) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 gap-4">
-        <p className="text-muted-foreground">No spreadsheet configured</p>
-        <Button onClick={() => router.push("/onboarding")}>
-          Setup Spreadsheet
-        </Button>
+        {isAdmin ? (
+          <>
+            <p className="text-muted-foreground">No spreadsheet configured</p>
+            <Button onClick={() => router.push("/onboarding")}>
+              Setup Spreadsheet
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground text-center">
+              No spreadsheet has been configured yet.<br />
+              Please wait for an admin to set up the spreadsheet.
+            </p>
+          </>
+        )}
       </div>
     );
   }
@@ -416,16 +429,25 @@ export default function DashboardPage() {
               </div>
               {syncProgress.status === "idle" && (
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => setShowChangeSpreadsheetDialog(true)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Change Spreadsheet
-                  </Button>
-                  <Button onClick={handleSyncClick} size="sm">
-                    Sync Now
-                  </Button>
+                  {isAdmin && (
+                    <>
+                      <Button
+                        onClick={() => setShowChangeSpreadsheetDialog(true)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Change Spreadsheet
+                      </Button>
+                      <Button onClick={handleSyncClick} size="sm">
+                        Sync Now
+                      </Button>
+                    </>
+                  )}
+                  {!isAdmin && config?.adminEmail && (
+                    <span className="text-xs text-muted-foreground">
+                      Managed by {config.adminEmail}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -434,7 +456,9 @@ export default function DashboardPage() {
             {syncProgress.status === "idle" && (
               <div className="text-sm text-muted-foreground">
                 <p>
-                  Sync your Google Sheets data to update crops and qualifiers.
+                  {isAdmin
+                    ? "Sync your Google Sheets data to update crops and qualifiers."
+                    : "Data is synced from Google Sheets by the admin."}
                 </p>
                 {config?.sheetNames && config.sheetNames.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
