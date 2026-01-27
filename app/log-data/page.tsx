@@ -633,7 +633,7 @@ export default function LogDataPage() {
             size="sm"
             onClick={() => router.push("/dashboard")}
           >
-            Dashboard
+            Back to Dashboard
           </Button>
         </div>
 
