@@ -691,23 +691,52 @@ export default function LogDataPage() {
                       selectedFeature.properties.Description;
 
                     // Find similar fields from the database
-                    const similarFields =
+                    const nameLower = name.toLowerCase();
+                    let similarFields =
                       uniqueFields?.filter((field) => {
                         const fieldLower = field.toLowerCase();
-                        const nameLower = name.toLowerCase();
-                        // Match if: starts with same letter, contains the name, or name contains field
-                        return (
-                          fieldLower[0] === nameLower[0] ||
-                          fieldLower.includes(nameLower) ||
-                          nameLower.includes(fieldLower.split(":")[0]) ||
-                          nameLower
-                            .split(" ")
-                            .some(
-                              (word) =>
-                                fieldLower.includes(word) && word.length > 1,
-                            )
-                        );
+                        const parentField = fieldLower.split(":")[0].trim();
+                        const subField = field.includes(":")
+                          ? fieldLower.split(":")[1].trim()
+                          : "";
+
+                        // Single char: prefix match on parent (A→A, A1; G→G, G1)
+                        if (nameLower.length === 1) {
+                          return parentField.startsWith(nameLower);
+                        }
+
+                        // Exact match on parent or subfield
+                        if (parentField === nameLower || subField === nameLower) {
+                          return true;
+                        }
+                        // Name with space: subfield starts with name (sub-variants like HT 1 Winter)
+                        if (nameLower.includes(" ")) {
+                          if (subField.startsWith(nameLower + " ")) {
+                            return true;
+                          }
+                        }
+                        // Name more specific than subfield (map "HT 1 Winter" → sub "HT 1")
+                        if (subField && subField.length > 1 && nameLower.startsWith(subField + " ")) {
+                          return true;
+                        }
+                        return false;
                       }) || [];
+                    // Fallback: treat each char as exact parent match (handles codes like "EFGHI")
+                    if (similarFields.length === 0) {
+                      const chars = [
+                        ...new Set(nameLower.replace(/\s/g, "").split("")),
+                      ];
+                      similarFields =
+                        uniqueFields?.filter((field) => {
+                          const parentField = field
+                            .toLowerCase()
+                            .split(":")[0]
+                            .trim();
+                          return chars.some((char) =>
+                            parentField === char,
+                          );
+                        }) || [];
+                    }
 
                     return (
                       <div className="space-y-4">
