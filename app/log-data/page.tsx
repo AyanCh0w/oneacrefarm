@@ -70,7 +70,11 @@ function detectLocationFromField(fieldName: string): string | undefined {
   const normalized = fieldName.toLowerCase();
 
   // Check for high tunnel
-  if (normalized.includes("ht") || normalized.includes("high tunnel") || normalized.includes("hightunnel")) {
+  if (
+    normalized.includes("ht") ||
+    normalized.includes("high tunnel") ||
+    normalized.includes("hightunnel")
+  ) {
     return "HT";
   }
 
@@ -92,7 +96,7 @@ function detectLocationFromField(fieldName: string): string | undefined {
 function findBestQualifier(
   cropName: string,
   fieldName: string,
-  qualifiers: Qualifier[] | undefined
+  qualifiers: Qualifier[] | undefined,
 ): Qualifier | null {
   if (!qualifiers || qualifiers.length === 0) return null;
 
@@ -103,16 +107,14 @@ function findBestQualifier(
   const locationMatch = qualifiers.find(
     (q) =>
       q.name.toLowerCase() === baseCropName.toLowerCase() &&
-      q.location?.toLowerCase() === location?.toLowerCase()
+      q.location?.toLowerCase() === location?.toLowerCase(),
   );
 
   if (locationMatch) return locationMatch;
 
   // Fall back to generic match (no location specified)
   const genericMatch = qualifiers.find(
-    (q) =>
-      q.name.toLowerCase() === baseCropName.toLowerCase() &&
-      !q.location
+    (q) => q.name.toLowerCase() === baseCropName.toLowerCase() && !q.location,
   );
 
   return genericMatch || null;
@@ -121,7 +123,7 @@ function findBestQualifier(
 // Helper to get combined assessments (universal + crop-specific)
 function getCombinedAssessments(
   qualifier: Qualifier | null,
-  universalQualifiers: UniversalQualifier[] | undefined
+  universalQualifiers: UniversalQualifier[] | undefined,
 ): { name: string; options: string[] }[] {
   // Get universal assessments (already sorted by order)
   const universalAssessments =
@@ -264,7 +266,7 @@ function FieldButton({
       className={cn(
         "w-full text-left p-4 rounded-xl border-2 transition-all duration-200",
         "hover:border-primary/50 hover:bg-primary/5 active:scale-[0.98]",
-        "flex flex-col items-start justify-center min-h-[6rem]",
+        "flex flex-col items-start justify-center min-h-24",
         isSelected
           ? "border-primary bg-primary/10 ring-2 ring-primary/20"
           : "border-border bg-card",
@@ -363,7 +365,7 @@ function OptionButton({
       className={cn(
         "w-full p-4 rounded-xl border-2 text-center font-medium text-lg",
         "transition-all duration-200 active:scale-[0.97]",
-        "min-h-[4rem] flex items-center justify-center",
+        "min-h-16 flex items-center justify-center",
         isSelected
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border bg-card hover:border-primary/50 hover:bg-primary/5",
@@ -663,7 +665,10 @@ export default function LogDataPage() {
     : null;
 
   // Get combined assessments (universal + crop-specific)
-  const combinedAssessments = getCombinedAssessments(selectedQualifier, universalQualifiers);
+  const combinedAssessments = getCombinedAssessments(
+    selectedQualifier,
+    universalQualifiers,
+  );
 
   // Handle field selection
   const handleFieldSelect = (field: string) => {
@@ -781,7 +786,7 @@ export default function LogDataPage() {
                 <Card className="overflow-hidden">
                   <CardContent className="p-0">
                     <MapboxMap
-                      className="h-[400px] md:h-[500px]"
+                      className="h-100 md:h-125"
                       style="mapbox://styles/ayanchow/cmkwthf8e005501qu4jcae74l"
                       initialCenter={[-77.451251, 39.162552]}
                       initialZoom={17}
@@ -821,7 +826,10 @@ export default function LogDataPage() {
                         }
 
                         // Exact match on parent or subfield
-                        if (parentField === nameLower || subField === nameLower) {
+                        if (
+                          parentField === nameLower ||
+                          subField === nameLower
+                        ) {
                           return true;
                         }
                         // Name with space: subfield starts with name (sub-variants like HT 1 Winter)
@@ -831,7 +839,11 @@ export default function LogDataPage() {
                           }
                         }
                         // Name more specific than subfield (map "HT 1 Winter" → sub "HT 1")
-                        if (subField && subField.length > 1 && nameLower.startsWith(subField + " ")) {
+                        if (
+                          subField &&
+                          subField.length > 1 &&
+                          nameLower.startsWith(subField + " ")
+                        ) {
                           return true;
                         }
                         return false;
@@ -847,9 +859,7 @@ export default function LogDataPage() {
                             .toLowerCase()
                             .split(":")[0]
                             .trim();
-                          return chars.some((char) =>
-                            parentField === char,
-                          );
+                          return chars.some((char) => parentField === char);
                         }) || [];
                     }
 
