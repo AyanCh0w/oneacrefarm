@@ -8,6 +8,47 @@ import { isAdmin } from "@/lib/auth";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
+/**
+ * Extract replanting information from notes.
+ * Patterns: "X replaced with Y", "replanted with X", "replaced by X", etc.
+ */
+function parseReplantingNotes(notes: string): {
+  originalCrop?: string;
+  originalVariety?: string;
+  replantingNote?: string;
+} | null {
+  if (!notes) return null;
+
+  const lowerNotes = notes.toLowerCase();
+
+  // Pattern: "X replaced with Y" or "replaced with Y"
+  const replacedWithMatch = notes.match(
+    /(?:(.+?)\s+)?replaced\s+(?:with|by)\s+(.+?)(?:\s+in\s+|$)/i
+  );
+  if (replacedWithMatch) {
+    const originalText = replacedWithMatch[1]?.trim();
+    const originalParts = originalText?.includes(":")
+      ? originalText.split(":").map((s) => s.trim())
+      : [originalText, ""];
+
+    return {
+      originalCrop: originalParts?.[0] || "",
+      originalVariety: originalParts?.[1] || "",
+      replantingNote: notes,
+    };
+  }
+
+  // Pattern: "replanted with X"
+  const replantedMatch = notes.match(/replanted\s+with\s+(.+?)(?:\s+in\s+|$)/i);
+  if (replantedMatch) {
+    return {
+      replantingNote: notes,
+    };
+  }
+
+  return null;
+}
+
 // Parse sheet data into structured crop records
 function parseSheetData(
   data: string[][],
@@ -21,6 +62,13 @@ function parseSheetData(
   rows: string;
   date: string;
   notes: string;
+  location?: string;
+  replantedFrom?: {
+    crop: string;
+    variety: string;
+    date: string;
+    notes: string;
+  };
 }> {
   if (data.length === 0) return [];
 
@@ -34,6 +82,43 @@ function parseSheetData(
     // Skip empty rows
     if (!bed && !cropVariety) continue;
 
+    // Check for multiple crops in the same bed (separated by "/")
+    // Example: "Cucumber: Mini Me / Cucumber: Tasty Green" with trays "1 / 0.2"
+    if (cropVariety?.includes(" / ")) {
+      const cropParts = cropVariety.split(" / ").map((s) => s.trim());
+      const traysParts = trays?.includes(" / ")
+        ? trays.split(" / ").map((s) => s.trim())
+        : [trays || ""];
+
+      // Create a separate record for each crop
+      for (let i = 0; i < cropParts.length; i++) {
+        const cropPart = cropParts[i];
+        const trayPart = traysParts[i] || traysParts[0] || "";
+
+        let crop = "";
+        let variety = "";
+        if (cropPart?.includes(":")) {
+          [crop, variety] = cropPart.split(":").map((s) => s.trim());
+        } else {
+          crop = cropPart || "";
+        }
+
+        if (crop.trim()) {
+          parsedData.push({
+            field: sheetName,
+            bed: bed || "",
+            crop: crop.trim(),
+            variety: variety.trim(),
+            trays: trayPart,
+            rows: rowsCount || "",
+            date: date || "",
+            notes: notes || "",
+          });
+        }
+      }
+      continue;
+    }
+
     // Parse crop:variety format (e.g., "Tomato:Roma" or just "Tomato")
     let crop = "";
     let variety = "";
@@ -44,7 +129,23 @@ function parseSheetData(
     }
 
     if (crop.trim()) {
-      parsedData.push({
+      const record: {
+        field: string;
+        bed: string;
+        crop: string;
+        variety: string;
+        trays: string;
+        rows: string;
+        date: string;
+        notes: string;
+        location?: string;
+        replantedFrom?: {
+          crop: string;
+          variety: string;
+          date: string;
+          notes: string;
+        };
+      } = {
         field: sheetName,
         bed: bed || "",
         crop: crop.trim(),
@@ -53,7 +154,20 @@ function parseSheetData(
         rows: rowsCount || "",
         date: date || "",
         notes: notes || "",
-      });
+      };
+
+      // Check for replanting information in notes
+      const replantingInfo = parseReplantingNotes(notes || "");
+      if (replantingInfo) {
+        record.replantedFrom = {
+          crop: replantingInfo.originalCrop || "",
+          variety: replantingInfo.originalVariety || "",
+          date: "", // We don't know the original date
+          notes: replantingInfo.replantingNote || "",
+        };
+      }
+
+      parsedData.push(record);
     }
   }
 
@@ -139,12 +253,17 @@ export async function POST(
     const isQualifiersSheet = sheetName.toLowerCase() === "qualifiers";
 
     if (isQualifiersSheet) {
-      // Parse Qualifiers data
-      const qualifiers = parseQualifiersSheet(stringValues);
+      // Parse Qualifiers data (separates universal and crop-specific)
+      const { vegetables, universalQualifiers } = parseQualifiersSheet(stringValues);
 
-      // Sync qualifiers to Convex
+      // Sync crop-specific qualifiers to Convex
       const qualifiersResult = await convex.mutation(api.sheets.syncQualifiers, {
-        qualifiers,
+        qualifiers: vegetables,
+      });
+
+      // Sync universal qualifiers separately
+      const universalResult = await convex.mutation(api.sheets.syncUniversalQualifiers, {
+        qualifiers: universalQualifiers,
       });
 
       // Also store raw sheet data
@@ -160,6 +279,8 @@ export async function POST(
         rowCount: stringValues.length,
         qualifiersCount: qualifiersResult.count,
         qualifiers: qualifiersResult.results,
+        universalCount: universalResult.count,
+        universalQualifiers: universalResult.results,
         sheetResult,
       });
     }

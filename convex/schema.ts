@@ -27,6 +27,15 @@ export default defineSchema({
           rows: v.string(),
           date: v.string(),
           notes: v.string(),
+          location: v.optional(v.string()),
+          replantedFrom: v.optional(
+            v.object({
+              crop: v.string(),
+              variety: v.string(),
+              date: v.string(),
+              notes: v.string(),
+            })
+          ),
         })
       )
     ),
@@ -44,14 +53,25 @@ export default defineSchema({
     rows: v.string(),
     date: v.string(),
     notes: v.string(),
+    location: v.optional(v.string()), // Detected location (e.g., "HT", "field")
+    replantedFrom: v.optional(
+      v.object({
+        crop: v.string(),
+        variety: v.string(),
+        date: v.string(),
+        notes: v.string(),
+      })
+    ), // If this crop replaced another, store original here
     lastSynced: v.number(),
   })
     .index("by_field", ["field"])
     .index("by_bed", ["bed"])
-    .index("by_crop", ["crop"]),
+    .index("by_crop", ["crop"])
+    .index("by_field_and_bed", ["field", "bed"]),
 
   qualifiers: defineTable({
-    name: v.string(),
+    name: v.string(), // Base crop name (e.g., "Tomato", "Cucumber")
+    location: v.optional(v.string()), // Location specifier (e.g., "HT", "field")
     assessments: v.array(
       v.object({
         name: v.string(),
@@ -59,7 +79,18 @@ export default defineSchema({
       })
     ),
     lastSynced: v.number(),
-  }).index("by_name", ["name"]),
+  })
+    .index("by_name", ["name"])
+    .index("by_name_and_location", ["name", "location"]),
+
+  // Universal assessments that apply to ALL crops
+  // Edit once, applies everywhere
+  universalQualifiers: defineTable({
+    name: v.string(), // Assessment question (e.g., "Planting quantity?")
+    options: v.array(v.string()), // Possible answers
+    order: v.number(), // Display order (lower numbers appear first)
+    lastSynced: v.number(),
+  }).index("by_order", ["order"]),
 
   // Quality logs for tracking crop assessments over time
   qualityLogs: defineTable({

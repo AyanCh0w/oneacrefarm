@@ -86,6 +86,15 @@ export const syncSheetData = mutation({
           rows: v.string(),
           date: v.string(),
           notes: v.string(),
+          location: v.optional(v.string()),
+          replantedFrom: v.optional(
+            v.object({
+              crop: v.string(),
+              variety: v.string(),
+              date: v.string(),
+              notes: v.string(),
+            })
+          ),
         })
       )
     ),
@@ -201,12 +210,13 @@ export const getUniqueCrops = query({
   },
 });
 
-// Mutation to sync qualifiers data
+// Mutation to sync qualifiers data (crop-specific only, universal goes to separate table)
 export const syncQualifiers = mutation({
   args: {
     qualifiers: v.array(
       v.object({
         name: v.string(),
+        location: v.optional(v.string()),
         assessments: v.array(
           v.object({
             name: v.string(),
@@ -221,10 +231,12 @@ export const syncQualifiers = mutation({
     const results = [];
 
     for (const qualifier of qualifiers) {
-      // Check if this qualifier already exists
+      // Check if this qualifier already exists (by name AND location)
       const existing = await ctx.db
         .query("qualifiers")
-        .withIndex("by_name", (q) => q.eq("name", qualifier.name))
+        .withIndex("by_name_and_location", (q) =>
+          q.eq("name", qualifier.name).eq("location", qualifier.location ?? undefined)
+        )
         .first();
 
       if (existing) {
@@ -232,14 +244,25 @@ export const syncQualifiers = mutation({
           assessments: qualifier.assessments,
           lastSynced: Date.now(),
         });
-        results.push({ name: qualifier.name, action: "updated", id: existing._id });
+        results.push({
+          name: qualifier.name,
+          location: qualifier.location,
+          action: "updated",
+          id: existing._id,
+        });
       } else {
         const id = await ctx.db.insert("qualifiers", {
           name: qualifier.name,
+          location: qualifier.location,
           assessments: qualifier.assessments,
           lastSynced: Date.now(),
         });
-        results.push({ name: qualifier.name, action: "created", id });
+        results.push({
+          name: qualifier.name,
+          location: qualifier.location,
+          action: "created",
+          id,
+        });
       }
     }
 
@@ -258,7 +281,7 @@ export const getAllQualifiers = query({
   },
 });
 
-// Get qualifier by name
+// Get qualifier by name (without location - for backwards compatibility)
 export const getQualifierByName = query({
   args: { name: v.string() },
   handler: async (ctx, args) => {
@@ -266,6 +289,108 @@ export const getQualifierByName = query({
       .query("qualifiers")
       .withIndex("by_name", (q) => q.eq("name", args.name))
       .first();
+  },
+});
+
+// Get qualifier by name and location
+export const getQualifierByNameAndLocation = query({
+  args: {
+    name: v.string(),
+    location: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("qualifiers")
+      .withIndex("by_name_and_location", (q) =>
+        q.eq("name", args.name).eq("location", args.location ?? undefined)
+      )
+      .first();
+  },
+});
+
+// ============ Universal Qualifiers ============
+
+// Sync universal qualifiers (assessments that apply to ALL crops)
+export const syncUniversalQualifiers = mutation({
+  args: {
+    qualifiers: v.array(
+      v.object({
+        name: v.string(),
+        options: v.array(v.string()),
+        order: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { qualifiers } = args;
+    const results = [];
+
+    // Get all existing universal qualifiers
+    const existing = await ctx.db.query("universalQualifiers").collect();
+    const existingMap = new Map(existing.map((q) => [q.name, q]));
+
+    // Track which ones we've seen
+    const seen = new Set<string>();
+
+    for (const qualifier of qualifiers) {
+      seen.add(qualifier.name);
+      const existingQualifier = existingMap.get(qualifier.name);
+
+      if (existingQualifier) {
+        // Update existing
+        await ctx.db.patch(existingQualifier._id, {
+          options: qualifier.options,
+          order: qualifier.order,
+          lastSynced: Date.now(),
+        });
+        results.push({
+          name: qualifier.name,
+          action: "updated",
+          id: existingQualifier._id,
+        });
+      } else {
+        // Create new
+        const id = await ctx.db.insert("universalQualifiers", {
+          name: qualifier.name,
+          options: qualifier.options,
+          order: qualifier.order,
+          lastSynced: Date.now(),
+        });
+        results.push({
+          name: qualifier.name,
+          action: "created",
+          id,
+        });
+      }
+    }
+
+    // Delete any that were removed from the source
+    for (const existingQualifier of existing) {
+      if (!seen.has(existingQualifier.name)) {
+        await ctx.db.delete(existingQualifier._id);
+        results.push({
+          name: existingQualifier.name,
+          action: "deleted",
+          id: existingQualifier._id,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      count: results.length,
+      results,
+    };
+  },
+});
+
+// Get all universal qualifiers (ordered by order field)
+export const getAllUniversalQualifiers = query({
+  handler: async (ctx) => {
+    return ctx.db
+      .query("universalQualifiers")
+      .withIndex("by_order")
+      .collect();
   },
 });
 

@@ -61,6 +61,7 @@ convex/
 
 lib/
 ├── google-sheets.ts             # GoogleSheetsClient class
+├── parse-qualifiers.ts          # Qualifiers sheet parser
 └── utils.ts                     # cn() utility for Tailwind
 ```
 
@@ -71,13 +72,101 @@ Stores raw synced sheet data:
 - `spreadsheetId`: string
 - `range`: string (e.g., "FieldName!A:ZZ")
 - `data`: string[][] (raw values)
-- `parsedData`: CropData[] (optional)
+- `parsedData`: CropData[] (optional, includes location and replanting info)
 - `lastSynced`: number (timestamp)
 
 ### crops table
 Stores parsed crop records:
-- `field`, `bed`, `crop`, `variety`, `trays`, `rows`, `date`, `notes`: string
+- `field`: string - Field name (e.g., "Field 3", "HT 1")
+- `bed`: string - Bed identifier
+- `crop`: string - Crop name (singular, e.g., "Tomato")
+- `variety`: string - Variety name
+- `trays`: string - Number of trays planted
+- `rows`: string - Number of rows
+- `date`: string - Planting date
+- `notes`: string - Planting notes
+- `location`: string (optional) - Auto-detected location type ("HT", "greenhouse", "field")
+- `replantedFrom`: object (optional) - Tracks replanting history
+  - `crop`: string - Original crop name
+  - `variety`: string - Original variety
+  - `date`: string - Original planting date
+  - `notes`: string - Replanting notes (e.g., "Tomato replaced with Cucumber")
 - `lastSynced`: number (timestamp)
+- **Indexes**: `by_field`, `by_bed`, `by_crop`, `by_field_and_bed`
+
+### qualifiers table
+Defines quality assessments for specific crops and locations:
+- `name`: string - Base crop name (e.g., "Tomato", "Cucumber")
+- `location`: string (optional) - Location specifier ("HT", "field", "greenhouse")
+  - Enables location-specific qualifiers (e.g., "Tomatoes, HT" vs "Tomatoes, field")
+- `assessments`: array of objects
+  - `name`: string - Assessment question (crop-specific only)
+  - `options`: array of strings - Possible answers
+- `lastSynced`: number (timestamp)
+- **Indexes**: `by_name`, `by_name_and_location`
+- **Note**: Universal assessments (that apply to all crops) are stored in the `universalQualifiers` table
+
+### universalQualifiers table
+Global assessments that apply to all crops (edit once, applies everywhere):
+- `name`: string - Assessment question (e.g., "Planting quantity?")
+- `options`: array of strings - Possible answers
+- `order`: number - Display order (lower numbers first)
+- `lastSynced`: number (timestamp)
+- **Indexes**: `by_order`
+- **Note**: These are automatically extracted from Qualifiers sheet during sync
+  - Assessments that appear in ALL crops are identified as universal
+  - They are stored separately to avoid duplication
+  - Combined with crop-specific qualifiers when displaying forms
+
+### qualityLogs table
+Tracks crop quality assessments over time:
+- `cropId`: Id<"crops"> - Reference to crop
+- `field`: string - Field name
+- `bed`: string - Bed identifier
+- `crop`: string - Crop name
+- `variety`: string - Variety name
+- `assessments`: array of objects - User responses
+  - `question`: string
+  - `answer`: string
+- `notes`: string (optional) - Additional notes
+- `timestamp`: number - When logged
+- **Indexes**: `by_crop_id`, `by_timestamp`, `by_field_and_bed`
+
+## Special Parsing Features
+
+### Multi-Crop Bed Support
+Beds can contain multiple crops separated by " / " in the Crop:Variety column:
+- Example: `"Cucumber: Mini Me / Cucumber: Tasty Green"` with trays `"1 / 0.2"`
+- Parser creates separate crop records for each entry
+- Trays are split proportionally, or first value is used if counts don't match
+
+### Replanting Detection
+Automatically detects replanting information from notes field:
+- **Patterns recognized**:
+  - `"Tomato replaced with Cucumber"` - Captures original crop
+  - `"Tomato: Roma replaced with Cucumber: Mini Me"` - Captures original crop + variety
+  - `"replanted with Cucumber"` - Notes replanting without original
+  - `"replaced by Cucumber in June"` - Alternative phrasing
+- Stores original crop info in `replantedFrom` field
+- UI displays ⚠ warning badges on replanted crops
+
+### Location Auto-Detection
+Field names are analyzed to determine location type:
+- **"HT"** - High tunnel (patterns: "HT", "High Tunnel", "HighTunnel")
+- **"greenhouse"** - Greenhouse (patterns: "Greenhouse", "GH")
+- **"field"** - Outdoor field (patterns: "Field", or default)
+- Location is stored in `crops.location` field
+- Enables location-specific qualifier matching
+
+### Qualifier Matching Logic
+When showing assessments for a crop:
+1. Extract base crop name (before ":") from crop field
+2. Detect location from field name
+3. Try to match qualifier by `name + location` (e.g., "Tomatoes, HT")
+4. Fall back to generic qualifier with no location
+5. Combine with universal assessments (DEPRECATED - will use universalQualifiers table)
+
+**Note**: Crops use SINGULAR names (e.g., "Tomato"), Qualifiers may use PLURAL (e.g., "Tomatoes"). Ensure naming consistency or add both versions.
 
 ## Current Features (V1 Progress)
 
@@ -89,11 +178,16 @@ Stores parsed crop records:
 - Dashboard displaying Qualifiers sheet data
 - Real-time sync progress indicators
 - Dark mode by default
-
-### Pending
+- Multi-crop bed parsing
+- Replanting detection and tracking
+- Location-based qualifier matching
+- Universal qualifiers system (separate table, edit once applies everywhere)
 - Field-based data entry forms
 - Crop quality assessment UI
+
+### Pending
 - Data visualization/charts
+- Analytics dashboard
 
 ## Business Context
 

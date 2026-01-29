@@ -27,16 +27,32 @@ interface Crop {
   rows: string;
   date: string;
   notes: string;
+  location?: string;
+  replantedFrom?: {
+    crop: string;
+    variety: string;
+    date: string;
+    notes: string;
+  };
   lastSynced: number;
 }
 
 interface Qualifier {
   _id: Id<"qualifiers">;
   name: string;
+  location?: string;
   assessments: {
     name: string;
     options: string[];
   }[];
+  lastSynced: number;
+}
+
+interface UniversalQualifier {
+  _id: Id<"universalQualifiers">;
+  name: string;
+  options: string[];
+  order: number;
   lastSynced: number;
 }
 
@@ -46,6 +62,79 @@ type ViewMode = "list" | "map";
 // Helper to extract base crop name (before colon)
 function getBaseCropName(cropName: string): string {
   return cropName.split(":")[0].trim();
+}
+
+// Helper to detect location from field name
+// Common patterns: "HT", "High Tunnel", "Greenhouse", etc.
+function detectLocationFromField(fieldName: string): string | undefined {
+  const normalized = fieldName.toLowerCase();
+
+  // Check for high tunnel
+  if (normalized.includes("ht") || normalized.includes("high tunnel") || normalized.includes("hightunnel")) {
+    return "HT";
+  }
+
+  // Check for greenhouse
+  if (normalized.includes("greenhouse") || normalized.includes("gh")) {
+    return "greenhouse";
+  }
+
+  // Otherwise, it's likely a field
+  if (normalized.includes("field")) {
+    return "field";
+  }
+
+  // Default to field for outdoor locations
+  return "field";
+}
+
+// Helper to get the best matching qualifier for a crop
+function findBestQualifier(
+  cropName: string,
+  fieldName: string,
+  qualifiers: Qualifier[] | undefined
+): Qualifier | null {
+  if (!qualifiers || qualifiers.length === 0) return null;
+
+  const baseCropName = getBaseCropName(cropName);
+  const location = detectLocationFromField(fieldName);
+
+  // First, try to find a location-specific match
+  const locationMatch = qualifiers.find(
+    (q) =>
+      q.name.toLowerCase() === baseCropName.toLowerCase() &&
+      q.location?.toLowerCase() === location?.toLowerCase()
+  );
+
+  if (locationMatch) return locationMatch;
+
+  // Fall back to generic match (no location specified)
+  const genericMatch = qualifiers.find(
+    (q) =>
+      q.name.toLowerCase() === baseCropName.toLowerCase() &&
+      !q.location
+  );
+
+  return genericMatch || null;
+}
+
+// Helper to get combined assessments (universal + crop-specific)
+function getCombinedAssessments(
+  qualifier: Qualifier | null,
+  universalQualifiers: UniversalQualifier[] | undefined
+): { name: string; options: string[] }[] {
+  // Get universal assessments (already sorted by order)
+  const universalAssessments =
+    universalQualifiers?.map((uq) => ({
+      name: uq.name,
+      options: uq.options,
+    })) || [];
+
+  // Get crop-specific assessments
+  const cropSpecificAssessments = qualifier?.assessments || [];
+
+  // Return universal assessments first, then crop-specific
+  return [...universalAssessments, ...cropSpecificAssessments];
 }
 
 // Skeleton components
@@ -246,6 +335,14 @@ function CropCard({
           {crop.notes}
         </p>
       )}
+      {crop.replantedFrom && (
+        <div className="mt-2 pt-2 border-t border-border/50">
+          <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">
+            ⚠ Replanted from: {crop.replantedFrom.crop}
+            {crop.replantedFrom.variety && ` (${crop.replantedFrom.variety})`}
+          </p>
+        </div>
+      )}
     </button>
   );
 }
@@ -279,12 +376,12 @@ function OptionButton({
 
 // Data Entry Component - All questions on one page
 function DataEntryForm({
-  qualifier,
+  assessments,
   selectedCrop,
   onSubmit,
   onBack,
 }: {
-  qualifier: Qualifier;
+  assessments: { name: string; options: string[] }[];
   selectedCrop: Crop;
   onSubmit: (
     responses: { question: string; answer: string }[],
@@ -295,7 +392,6 @@ function DataEntryForm({
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
 
-  const assessments = qualifier.assessments;
   const answeredCount = Object.keys(responses).length;
   const allAnswered = assessments.every((a) => responses[a.name]);
 
@@ -357,6 +453,25 @@ function DataEntryForm({
             <p className="mt-3 text-sm text-muted-foreground bg-muted/30 rounded-lg p-2">
               <span className="font-medium">Notes:</span> {selectedCrop.notes}
             </p>
+          )}
+          {selectedCrop.replantedFrom && (
+            <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-900 dark:text-amber-200">
+                <span className="font-semibold">⚠ Replanting History:</span>
+                <br />
+                Previously: {selectedCrop.replantedFrom.crop}
+                {selectedCrop.replantedFrom.variety &&
+                  ` (${selectedCrop.replantedFrom.variety})`}
+                {selectedCrop.replantedFrom.notes && (
+                  <>
+                    <br />
+                    <span className="text-xs italic">
+                      {selectedCrop.replantedFrom.notes}
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -508,6 +623,7 @@ export default function LogDataPage() {
   // Convex queries
   const crops = useQuery(api.sheets.getAllCrops);
   const qualifiers = useQuery(api.sheets.getAllQualifiers);
+  const universalQualifiers = useQuery(api.sheets.getAllUniversalQualifiers);
   const uniqueFields = useQuery(api.sheets.getUniqueFields);
   const createQualityLog = useMutation(api.sheets.createQualityLog);
 
@@ -541,14 +657,13 @@ export default function LogDataPage() {
   });
 
   // Get the qualifier definition for the selected crop
-  // Match by base crop name (before the colon)
-  const selectedQualifier =
-    selectedCrop && qualifiers
-      ? qualifiers.find((q) => {
-          const baseCropName = getBaseCropName(selectedCrop.crop);
-          return q.name.toLowerCase() === baseCropName.toLowerCase();
-        })
-      : null;
+  // Match by base crop name and location
+  const selectedQualifier = selectedCrop
+    ? findBestQualifier(selectedCrop.crop, selectedCrop.field, qualifiers)
+    : null;
+
+  // Get combined assessments (universal + crop-specific)
+  const combinedAssessments = getCombinedAssessments(selectedQualifier, universalQualifiers);
 
   // Handle field selection
   const handleFieldSelect = (field: string) => {
@@ -907,9 +1022,9 @@ export default function LogDataPage() {
           <>
             {!qualifiers ? (
               <QuestionSkeleton />
-            ) : selectedQualifier ? (
+            ) : combinedAssessments.length > 0 ? (
               <DataEntryForm
-                qualifier={selectedQualifier}
+                assessments={combinedAssessments}
                 selectedCrop={selectedCrop}
                 onSubmit={handleSubmit}
                 onBack={handleBackToCrops}
