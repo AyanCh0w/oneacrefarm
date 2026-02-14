@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -14,8 +14,22 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 interface SheetConfig {
   spreadsheetId: string;
@@ -31,6 +45,23 @@ interface SyncProgress {
   currentField: string;
   status: "idle" | "syncing" | "complete" | "error";
   error?: string;
+}
+
+const CHART_COLORS = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+];
+
+function formatPercent(value: number): string {
+  return `${Math.round(value)}%`;
+}
+
+function formatWeekLabel(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 // Sync Progress Bar Component
@@ -83,15 +114,19 @@ export default function AnalyticsPage() {
   );
 
   // Derive config from Convex settings
-  const config: SheetConfig | null = settings
-    ? {
-        spreadsheetId: settings.spreadsheetId,
-        spreadsheetName: settings.spreadsheetName,
-        sheetNames: settings.sheetNames,
-        adminUserId: settings.adminUserId,
-        adminEmail: settings.adminEmail,
-      }
-    : null;
+  const config: SheetConfig | null = useMemo(
+    () =>
+      settings
+        ? {
+            spreadsheetId: settings.spreadsheetId,
+            spreadsheetName: settings.spreadsheetName,
+            sheetNames: settings.sheetNames,
+            adminUserId: settings.adminUserId,
+            adminEmail: settings.adminEmail,
+          }
+        : null,
+    [settings],
+  );
 
   // Config is loaded when settings query has returned (even if null)
   const configLoaded = settings !== undefined;
@@ -110,12 +145,28 @@ export default function AnalyticsPage() {
     null,
   );
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+  const [selectedCropFilter, setSelectedCropFilter] = useState("all");
+  const [selectedFieldFilter, setSelectedFieldFilter] = useState("all");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
 
   // Check if user is admin (using Clerk publicMetadata)
   const isAdmin = user?.publicMetadata?.role === "admin";
 
   // Convex queries and mutations
   const lastSyncTime = useQuery(api.sheets.getLastSyncTime);
+  const analyticsFilters = useMemo(
+    () => ({
+      startDate: startDateFilter || undefined,
+      endDate: endDateFilter || undefined,
+      crop: selectedCropFilter === "all" ? undefined : selectedCropFilter,
+      field: selectedFieldFilter === "all" ? undefined : selectedFieldFilter,
+    }),
+    [startDateFilter, endDateFilter, selectedCropFilter, selectedFieldFilter],
+  );
+  const analytics = useQuery(api.sheets.getAnalyticsOverview, analyticsFilters);
   const deleteSheetByField = useMutation(api.sheets.deleteSheetByField);
 
   // Fetch spreadsheet last modified time
@@ -151,6 +202,38 @@ export default function AnalyticsPage() {
     const modifiedTime = new Date(sheetLastModified).getTime();
     return modifiedTime > lastSyncTime;
   }, [sheetLastModified, lastSyncTime]);
+
+  const topCropData = analytics?.byCrop.slice(0, 8) ?? [];
+  const weeklyData = analytics?.logsByWeek ?? [];
+  const planningByCropData =
+    analytics?.planning.byCrop.slice(0, 8).map((row) => ({
+      crop: row.crop,
+      under: -row.underRate,
+      onTarget: row.onTargetRate,
+      over: row.overRate,
+      samples: row.total,
+    })) ?? [];
+  const planningTrendData =
+    analytics?.planning.trend.map((row) => ({
+      weekStart: row.weekStart,
+      balance: row.balance,
+      underRate: row.underRate,
+      overRate: row.overRate,
+    })) ?? [];
+  const planningPieData = analytics
+    ? [
+        { name: "Underplanned", value: analytics.planning.underCount },
+        { name: "On target", value: analytics.planning.onTargetCount },
+        { name: "Overplanned", value: analytics.planning.overCount },
+      ].filter((item) => item.value > 0)
+    : [];
+
+  const hasActiveFilters =
+    selectedCropFilter !== "all" ||
+    selectedFieldFilter !== "all" ||
+    startDateFilter.length > 0 ||
+    endDateFilter.length > 0;
+  const shouldShowCropCharts = selectedCropFilter === "all";
 
   // Sync all sheets
   const syncAllSheets = useCallback(async () => {
@@ -347,110 +430,471 @@ export default function AnalyticsPage() {
             <h1 className="text-2xl font-bold">Analytics</h1>
             <p className="text-muted-foreground">{config?.spreadsheetName}</p>
           </div>
-          <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-            Back to Dashboard
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFiltersPanel((prev) => !prev)}
+            >
+              {showFiltersPanel ? "Hide Filters" : "Filters"}
+            </Button>
+            <Button variant="ghost" onClick={() => router.push("/dashboard")}>
+              Back to Dashboard
+            </Button>
+          </div>
+        </div>
+
+        {/* Collapsible filters */}
+        {showFiltersPanel && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Interactive Filters</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Crop</label>
+                  <select
+                    value={selectedCropFilter}
+                    onChange={(e) => setSelectedCropFilter(e.target.value)}
+                    className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm"
+                  >
+                    <option value="all">All crops</option>
+                    {(analytics?.filters.cropOptions ?? []).map((crop) => (
+                      <option key={crop} value={crop}>
+                        {crop}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Field</label>
+                  <select
+                    value={selectedFieldFilter}
+                    onChange={(e) => setSelectedFieldFilter(e.target.value)}
+                    className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm"
+                  >
+                    <option value="all">All fields</option>
+                    {(analytics?.filters.fieldOptions ?? []).map((field) => (
+                      <option key={field} value={field}>
+                        {field}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Start date</label>
+                  <input
+                    type="date"
+                    value={startDateFilter}
+                    onChange={(e) => setStartDateFilter(e.target.value)}
+                    className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">End date</label>
+                  <input
+                    type="date"
+                    value={endDateFilter}
+                    onChange={(e) => setEndDateFilter(e.target.value)}
+                    className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setSelectedCropFilter("all");
+                      setSelectedFieldFilter("all");
+                      setStartDateFilter("");
+                      setEndDateFilter("");
+                    }}
+                    disabled={!hasActiveFilters}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              </div>
+              {hasActiveFilters && (
+                <p className="text-xs text-muted-foreground">
+                  Showing filtered analytics across all charts.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {analytics === undefined ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">Loading analytics...</p>
+          </Card>
+        ) : analytics.totals.totalLogs === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">
+              No quality logs yet. Add entries from Log Data to populate analytics.
+            </p>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Total Logs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold">{analytics.totals.totalLogs}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Active Crops
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold">
+                    {analytics.totals.uniqueCrops}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Planning Sample
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold">
+                    {analytics.planning.sampleSize}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Planning Balance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold">
+                    {formatPercent(analytics.planning.balance)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Under minus over
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div
+              className={`grid grid-cols-1 gap-6 ${
+                shouldShowCropCharts ? "lg:grid-cols-2" : ""
+              }`}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Logs Over Time</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={weeklyData}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                        <XAxis
+                          dataKey="weekStart"
+                          tickFormatter={formatWeekLabel}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          labelFormatter={(value) =>
+                            `Week of ${formatWeekLabel(String(value))}`
+                          }
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="logsCount"
+                          name="Logs"
+                          stroke={CHART_COLORS[0]}
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {shouldShowCropCharts && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Logs by Crop</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={topCropData}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                          <Tooltip />
+                          <Bar dataKey="value" name="Logs" fill={CHART_COLORS[1]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {!shouldShowCropCharts && (
+              <p className="text-xs text-muted-foreground">
+                Crop-level charts are hidden while a specific crop filter is selected.
+              </p>
+            )}
+
+            <div
+              className={`grid grid-cols-1 gap-6 ${
+                shouldShowCropCharts ? "lg:grid-cols-2" : ""
+              }`}
+            >
+              {shouldShowCropCharts && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Over / Under Planning by Crop</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={planningByCropData} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                          <XAxis
+                            type="number"
+                            tickFormatter={(value) =>
+                              formatPercent(Math.abs(Number(value)))
+                            }
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="crop"
+                            width={92}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <Tooltip
+                            formatter={(value) =>
+                              formatPercent(Math.abs(Number(value)))
+                            }
+                          />
+                          <Legend />
+                          <Bar
+                            dataKey="under"
+                            stackId="planning"
+                            fill={CHART_COLORS[3]}
+                            name="Under"
+                          />
+                          <Bar
+                            dataKey="onTarget"
+                            stackId="planning"
+                            fill={CHART_COLORS[0]}
+                            name="On target"
+                          />
+                          <Bar
+                            dataKey="over"
+                            stackId="planning"
+                            fill={CHART_COLORS[4]}
+                            name="Over"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Planning Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={planningPieData}
+                          dataKey="value"
+                          nameKey="name"
+                          outerRadius={110}
+                          label={({ name, percent }) =>
+                            `${name} ${Math.round((percent || 0) * 100)}%`
+                          }
+                        >
+                          {planningPieData.map((entry, index) => (
+                            <Cell
+                              key={`${entry.name}-${index}`}
+                              fill={CHART_COLORS[index % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Planning Balance Trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={planningTrendData}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                      <XAxis
+                        dataKey="weekStart"
+                        tickFormatter={formatWeekLabel}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis tickFormatter={formatPercent} tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value) => formatPercent(Number(value))}
+                        labelFormatter={(value) =>
+                          `Week of ${formatWeekLabel(String(value))}`
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="balance"
+                        name="Under - Over"
+                        stroke={CHART_COLORS[2]}
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        <div className="fixed right-5 bottom-5 md:right-8 md:bottom-8 z-30">
+          <Button onClick={() => setShowSyncDialog(true)} size="sm">
+            Sync Data
           </Button>
         </div>
 
-        {/* Sync Spreadsheet Data Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Sync Spreadsheet Data</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {syncProgress.status === "idle" && (
-              <div className="space-y-4">
-                <div className="text-sm text-muted-foreground space-y-1">
-                  {lastSyncTime !== undefined && (
-                    <p>Last synced: {formatLastSync(lastSyncTime)}</p>
-                  )}
-                  {!isLoadingMetadata && sheetLastModified && (
-                    <p>Sheet edited: {formatLastModified(sheetLastModified)}</p>
-                  )}
+        <Dialog open={showSyncDialog} onOpenChange={setShowSyncDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sync Spreadsheet Data</DialogTitle>
+              <DialogDescription>
+                Keep analytics up to date by syncing your connected spreadsheet.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {syncProgress.status === "idle" && (
+                <>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    {lastSyncTime !== undefined && (
+                      <p>Last synced: {formatLastSync(lastSyncTime)}</p>
+                    )}
+                    {!isLoadingMetadata && sheetLastModified && (
+                      <p>Sheet edited: {formatLastModified(sheetLastModified)}</p>
+                    )}
+                  </div>
+
+                  <div className="text-sm text-muted-foreground">
+                    <p>
+                      {isAdmin
+                        ? "Sync your Google Sheets data to update crops and qualifiers."
+                        : "Data is synced from Google Sheets by the admin."}
+                    </p>
+                    {config?.sheetNames && config.sheetNames.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {config.sheetNames.map((name) => (
+                          <span
+                            key={name}
+                            className="px-2.5 py-1 bg-muted rounded-md text-xs font-medium"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {syncProgress.status === "syncing" && (
+                <SyncProgressBar progress={syncProgress} />
+              )}
+
+              {syncProgress.status === "complete" && (
+                <div className="flex items-center gap-2 text-green-500">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span className="font-medium">Sync complete!</span>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  <p>
-                    {isAdmin
-                      ? "Sync your Google Sheets data to update crops and qualifiers."
-                      : "Data is synced from Google Sheets by the admin."}
-                  </p>
-                  {config?.sheetNames && config.sheetNames.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {config.sheetNames.map((name) => (
-                        <span
-                          key={name}
-                          className="px-2.5 py-1 bg-muted rounded-md text-xs font-medium"
-                        >
-                          {name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+              )}
+
+              {syncProgress.status === "error" && (
+                <div className="space-y-3">
+                  <p className="text-red-500 text-sm">{syncProgress.error}</p>
+                  <Button onClick={syncAllSheets} size="sm" variant="outline">
+                    Try Again
+                  </Button>
                 </div>
-                <div className="flex gap-2 pt-2">
-                  {isAdmin && (
-                    <>
-                      <Button
-                        onClick={() => setShowChangeSpreadsheetDialog(true)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Change Spreadsheet
-                      </Button>
-                      <Button onClick={handleSyncClick} size="sm">
-                        Sync Now
-                      </Button>
-                    </>
-                  )}
-                  {!isAdmin && config?.adminEmail && (
-                    <span className="text-xs text-muted-foreground">
-                      Managed by {config.adminEmail}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {syncProgress.status === "syncing" && (
-              <SyncProgressBar progress={syncProgress} />
-            )}
-
-            {syncProgress.status === "complete" && (
-              <div className="flex items-center gap-2 text-green-500">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span className="font-medium">Sync complete!</span>
-              </div>
-            )}
-
-            {syncProgress.status === "error" && (
-              <div className="space-y-3">
-                <p className="text-red-500 text-sm">{syncProgress.error}</p>
-                <Button onClick={syncAllSheets} size="sm" variant="outline">
-                  Try Again
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Placeholder for future analytics */}
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">
-            More analytics features coming soon...
-          </p>
-        </Card>
+            <DialogFooter>
+              {!isAdmin && config?.adminEmail && (
+                <span className="mr-auto text-xs text-muted-foreground">
+                  Managed by {config.adminEmail}
+                </span>
+              )}
+              <Button variant="outline" onClick={() => setShowSyncDialog(false)}>
+                Close
+              </Button>
+              {isAdmin && syncProgress.status !== "syncing" && (
+                <>
+                  <Button
+                    onClick={() => {
+                      setShowSyncDialog(false);
+                      setShowChangeSpreadsheetDialog(true);
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Change Spreadsheet
+                  </Button>
+                  <Button onClick={handleSyncClick} size="sm">
+                    Sync Now
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Change Spreadsheet Confirmation Dialog */}
         <Dialog

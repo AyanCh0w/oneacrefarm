@@ -1,6 +1,78 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+type PlanningBucket = "under" | "on_target" | "over" | "unknown";
+
+function normalizeLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function isPlanningQuestion(question: string): boolean {
+  const q = normalizeLabel(question);
+  return (
+    q.includes("planting quantity") ||
+    q.includes("quantity planted") ||
+    q.includes("quantity?") ||
+    q.includes("planted too")
+  );
+}
+
+function getPlanningBucket(answer: string): PlanningBucket {
+  const normalized = normalizeLabel(answer);
+
+  if (
+    normalized.includes("not enough") ||
+    normalized.includes("too little") ||
+    normalized.includes("under")
+  ) {
+    return "under";
+  }
+
+  if (
+    normalized.includes("too much") ||
+    normalized.includes("too many") ||
+    normalized.includes("over") ||
+    normalized.includes("excess")
+  ) {
+    return "over";
+  }
+
+  if (
+    normalized.includes("just right") ||
+    normalized.includes("perfect") ||
+    normalized.includes("ideal") ||
+    normalized.includes("right amount")
+  ) {
+    return "on_target";
+  }
+
+  return "unknown";
+}
+
+function startOfWeekUtc(timestamp: number): Date {
+  const date = new Date(timestamp);
+  const day = date.getUTCDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + diffToMonday);
+  return date;
+}
+
+function dateKey(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function getStartTimestampFromDate(dateString: string): number {
+  return new Date(`${dateString}T00:00:00.000Z`).getTime();
+}
+
+function getEndTimestampFromDate(dateString: string): number {
+  return new Date(`${dateString}T23:59:59.999Z`).getTime();
+}
+
 // ============ Settings (Global Spreadsheet Config) ============
 
 // Get the global spreadsheet settings
@@ -221,6 +293,7 @@ export const syncQualifiers = mutation({
           v.object({
             name: v.string(),
             options: v.array(v.string()),
+            isUniversal: v.optional(v.boolean()),
           })
         ),
       })
@@ -500,6 +573,262 @@ export const getQualityLogStats = query({
       byCrop,
       byField,
       responseStats,
+    };
+  },
+});
+
+// Analytics-ready datasets for the analytics page charts
+export const getAnalyticsOverview = query({
+  args: {
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    crop: v.optional(v.string()),
+    field: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const [allLogs, crops] = await Promise.all([
+      ctx.db.query("qualityLogs").collect(),
+      ctx.db.query("crops").collect(),
+    ]);
+
+    const cropOptions = [...new Set(allLogs.map((l) => l.crop))].sort();
+    const fieldOptions = [...new Set(allLogs.map((l) => l.field))].sort();
+
+    const startTs = args.startDate ? getStartTimestampFromDate(args.startDate) : null;
+    const endTs = args.endDate ? getEndTimestampFromDate(args.endDate) : null;
+
+    const logs = allLogs.filter((log) => {
+      if (args.crop && log.crop !== args.crop) return false;
+      if (args.field && log.field !== args.field) return false;
+      if (startTs !== null && log.assessmentDate < startTs) return false;
+      if (endTs !== null && log.assessmentDate > endTs) return false;
+      return true;
+    });
+
+    const byCrop = new Map<string, number>();
+    const byField = new Map<string, number>();
+    const logsByWeek = new Map<string, number>();
+    const questionStats = new Map<string, Map<string, number>>();
+
+    const planningByCrop = new Map<
+      string,
+      { under: number; onTarget: number; over: number; unknown: number; total: number }
+    >();
+    const planningByField = new Map<
+      string,
+      { under: number; onTarget: number; over: number; unknown: number; total: number }
+    >();
+    const planningByWeek = new Map<
+      string,
+      { under: number; onTarget: number; over: number; unknown: number; total: number }
+    >();
+
+    let underCount = 0;
+    let onTargetCount = 0;
+    let overCount = 0;
+    let unknownCount = 0;
+    let planningSampleSize = 0;
+
+    for (const log of logs) {
+      byCrop.set(log.crop, (byCrop.get(log.crop) || 0) + 1);
+      byField.set(log.field, (byField.get(log.field) || 0) + 1);
+
+      const weekKey = dateKey(startOfWeekUtc(log.assessmentDate));
+      logsByWeek.set(weekKey, (logsByWeek.get(weekKey) || 0) + 1);
+
+      let planningBucket: PlanningBucket | null = null;
+
+      for (const response of log.responses) {
+        if (!questionStats.has(response.question)) {
+          questionStats.set(response.question, new Map<string, number>());
+        }
+        const answerCounts = questionStats.get(response.question)!;
+        answerCounts.set(response.answer, (answerCounts.get(response.answer) || 0) + 1);
+
+        if (!planningBucket && isPlanningQuestion(response.question)) {
+          planningBucket = getPlanningBucket(response.answer);
+        }
+      }
+
+      if (!planningBucket) continue;
+
+      planningSampleSize += 1;
+      if (planningBucket === "under") underCount += 1;
+      if (planningBucket === "on_target") onTargetCount += 1;
+      if (planningBucket === "over") overCount += 1;
+      if (planningBucket === "unknown") unknownCount += 1;
+
+      if (!planningByCrop.has(log.crop)) {
+        planningByCrop.set(log.crop, {
+          under: 0,
+          onTarget: 0,
+          over: 0,
+          unknown: 0,
+          total: 0,
+        });
+      }
+      if (!planningByField.has(log.field)) {
+        planningByField.set(log.field, {
+          under: 0,
+          onTarget: 0,
+          over: 0,
+          unknown: 0,
+          total: 0,
+        });
+      }
+      if (!planningByWeek.has(weekKey)) {
+        planningByWeek.set(weekKey, {
+          under: 0,
+          onTarget: 0,
+          over: 0,
+          unknown: 0,
+          total: 0,
+        });
+      }
+
+      const cropStats = planningByCrop.get(log.crop)!;
+      const fieldStats = planningByField.get(log.field)!;
+      const weekStats = planningByWeek.get(weekKey)!;
+
+      cropStats.total += 1;
+      fieldStats.total += 1;
+      weekStats.total += 1;
+
+      if (planningBucket === "under") {
+        cropStats.under += 1;
+        fieldStats.under += 1;
+        weekStats.under += 1;
+      } else if (planningBucket === "on_target") {
+        cropStats.onTarget += 1;
+        fieldStats.onTarget += 1;
+        weekStats.onTarget += 1;
+      } else if (planningBucket === "over") {
+        cropStats.over += 1;
+        fieldStats.over += 1;
+        weekStats.over += 1;
+      } else {
+        cropStats.unknown += 1;
+        fieldStats.unknown += 1;
+        weekStats.unknown += 1;
+      }
+    }
+
+    const cropChart = Array.from(byCrop.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const fieldChart = Array.from(byField.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const weeklyChart = Array.from(logsByWeek.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([weekStart, logsCount]) => ({ weekStart, logsCount }));
+
+    const responseByQuestion = Array.from(questionStats.entries())
+      .map(([question, answers]) => ({
+        question,
+        total: Array.from(answers.values()).reduce((sum, count) => sum + count, 0),
+        answers: Array.from(answers.entries())
+          .map(([answer, count]) => ({ answer, count }))
+          .sort((a, b) => b.count - a.count),
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const planningByCropChart = Array.from(planningByCrop.entries())
+      .map(([crop, stats]) => {
+        const total = stats.total || 1;
+        const underRate = (stats.under / total) * 100;
+        const onTargetRate = (stats.onTarget / total) * 100;
+        const overRate = (stats.over / total) * 100;
+        return {
+          crop,
+          total: stats.total,
+          under: stats.under,
+          onTarget: stats.onTarget,
+          over: stats.over,
+          unknown: stats.unknown,
+          underRate,
+          onTargetRate,
+          overRate,
+          balance: underRate - overRate,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    const planningByFieldChart = Array.from(planningByField.entries())
+      .map(([field, stats]) => {
+        const total = stats.total || 1;
+        const underRate = (stats.under / total) * 100;
+        const onTargetRate = (stats.onTarget / total) * 100;
+        const overRate = (stats.over / total) * 100;
+        return {
+          field,
+          total: stats.total,
+          under: stats.under,
+          onTarget: stats.onTarget,
+          over: stats.over,
+          unknown: stats.unknown,
+          underRate,
+          onTargetRate,
+          overRate,
+          balance: underRate - overRate,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    const planningTrend = Array.from(planningByWeek.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([weekStart, stats]) => {
+        const total = stats.total || 1;
+        const underRate = (stats.under / total) * 100;
+        const overRate = (stats.over / total) * 100;
+        return {
+          weekStart,
+          total: stats.total,
+          under: stats.under,
+          onTarget: stats.onTarget,
+          over: stats.over,
+          unknown: stats.unknown,
+          underRate,
+          overRate,
+          balance: underRate - overRate,
+        };
+      });
+
+    return {
+      filters: {
+        cropOptions,
+        fieldOptions,
+      },
+      totals: {
+        totalLogs: logs.length,
+        totalCrops: crops.length,
+        uniqueCrops: new Set(crops.map((c) => c.crop)).size,
+        uniqueFields: new Set(crops.map((c) => c.field)).size,
+      },
+      logsByWeek: weeklyChart,
+      byCrop: cropChart,
+      byField: fieldChart,
+      responseByQuestion,
+      planning: {
+        sampleSize: planningSampleSize,
+        underCount,
+        onTargetCount,
+        overCount,
+        unknownCount,
+        underRate: planningSampleSize > 0 ? (underCount / planningSampleSize) * 100 : 0,
+        onTargetRate:
+          planningSampleSize > 0 ? (onTargetCount / planningSampleSize) * 100 : 0,
+        overRate: planningSampleSize > 0 ? (overCount / planningSampleSize) * 100 : 0,
+        balance:
+          planningSampleSize > 0
+            ? ((underCount - overCount) / planningSampleSize) * 100
+            : 0,
+        byCrop: planningByCropChart,
+        byField: planningByFieldChart,
+        trend: planningTrend,
+      },
     };
   },
 });

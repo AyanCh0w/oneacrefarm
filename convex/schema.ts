@@ -76,6 +76,7 @@ export default defineSchema({
       v.object({
         name: v.string(),
         options: v.array(v.string()),
+        isUniversal: v.optional(v.boolean()),
       })
     ),
     lastSynced: v.number(),
