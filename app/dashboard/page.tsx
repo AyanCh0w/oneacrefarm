@@ -14,6 +14,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { UserButton } from "@clerk/clerk-react";
 import { useUser } from "@clerk/nextjs";
@@ -41,17 +46,33 @@ function StatsCard({
   value,
   subtitle,
   loading,
+  detailItems,
 }: {
   title: string;
   value: number | string;
   subtitle?: string;
   loading?: boolean;
+  detailItems?: string[];
 }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
           {title}
+          {detailItems && detailItems.length > 0 && (
+            <Popover>
+              <PopoverTrigger className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs font-medium ml-1.5 shrink-0 cursor-pointer hover:bg-muted/80 active:scale-95 transition-transform">
+                ?
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" sideOffset={8} className="max-w-[220px] max-h-[240px] overflow-y-auto">
+                <ul className="text-sm text-popover-foreground space-y-1">
+                  {detailItems.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </PopoverContent>
+            </Popover>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -157,10 +178,16 @@ export default function DashboardPage() {
   // Get selected log details
   const selectedLog = qualityLogs?.find((log) => log._id === selectedLogId);
 
-  // Get unique crop types count
-  const uniqueCropTypes = crops
-    ? [...new Set(crops.map((c) => c.crop))].length
-    : 0;
+  // Get unique crop types
+  const uniqueCropTypeNames = crops
+    ? [...new Set(crops.map((c) => c.crop))].sort()
+    : [];
+  const uniqueCropTypes = uniqueCropTypeNames.length;
+
+  // Get all crop names (crop + variety) for the Total Crops detail
+  const allCropNames = crops
+    ? crops.map((c) => c.variety ? `${c.crop}: ${c.variety}` : c.crop).sort()
+    : [];
 
   // No config - show setup prompt (admin) or waiting message (non-admin)
   if (configLoaded && !config) {
@@ -255,6 +282,7 @@ export default function DashboardPage() {
               uniqueFields ? `${uniqueFields.length} fields` : undefined
             }
             loading={crops === undefined}
+            detailItems={allCropNames}
           />
           <StatsCard
             title="Crop Types"
@@ -265,6 +293,7 @@ export default function DashboardPage() {
                 : undefined
             }
             loading={crops === undefined || uniqueVarieties === undefined}
+            detailItems={uniqueCropTypeNames}
           />
           <StatsCard
             title="Quality Logs"
@@ -276,6 +305,7 @@ export default function DashboardPage() {
             title="Fields"
             value={uniqueFields?.length ?? 0}
             loading={uniqueFields === undefined}
+            detailItems={uniqueFields ?? undefined}
           />
         </div>
 
