@@ -38,6 +38,7 @@ function getPlanningBucket(answer: string): PlanningBucket {
   }
 
   if (
+    normalized.includes("on target") ||
     normalized.includes("just right") ||
     normalized.includes("perfect") ||
     normalized.includes("ideal") ||
@@ -841,6 +842,20 @@ export const getLastSyncTime = query({
 
     const lastSyncTimes = sheets.map((s) => s.lastSynced);
     return Math.max(...lastSyncTimes);
+  },
+});
+
+// Get dates that have quality log entries (for calendar highlighting)
+export const getLogDates = query({
+  handler: async (ctx) => {
+    const logs = await ctx.db.query("qualityLogs").collect();
+    const dates = new Set<string>();
+    for (const log of logs) {
+      // Convert timestamp to YYYY-MM-DD
+      const d = new Date(log.assessmentDate);
+      dates.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    }
+    return [...dates].sort();
   },
 });
 

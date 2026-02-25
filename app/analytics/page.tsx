@@ -20,6 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Bar,
   BarChart,
@@ -189,6 +190,11 @@ export default function AnalyticsPage() {
     [startDateFilter, endDateFilter, selectedCropFilter, selectedFieldFilter],
   );
   const analytics = useQuery(api.sheets.getAnalyticsOverview, analyticsFilters);
+  const logDates = useQuery(api.sheets.getLogDates);
+  const logDateSet = useMemo(
+    () => new Set(logDates ?? []),
+    [logDates],
+  );
   const deleteSheetByField = useMutation(api.sheets.deleteSheetByField);
 
   // Fetch spreadsheet last modified time
@@ -506,21 +512,65 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Start date</label>
-                  <input
-                    type="date"
-                    value={startDateFilter}
-                    onChange={(e) => setStartDateFilter(e.target.value)}
-                    className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm"
-                  />
+                  <Popover>
+                    <PopoverTrigger className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm text-left">
+                      {startDateFilter
+                        ? new Date(startDateFilter + "T00:00:00").toLocaleDateString()
+                        : "Pick date"}
+                    </PopoverTrigger>
+                    <PopoverContent side="bottom" align="start" sideOffset={4} className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={startDateFilter ? new Date(startDateFilter + "T00:00:00") : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const y = date.getFullYear();
+                            const m = String(date.getMonth() + 1).padStart(2, "0");
+                            const d = String(date.getDate()).padStart(2, "0");
+                            setStartDateFilter(`${y}-${m}-${d}`);
+                          } else {
+                            setStartDateFilter("");
+                          }
+                        }}
+                        modifiers={{ hasData: (date: Date) => {
+                          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                          return logDateSet.has(key);
+                        }}}
+                        modifiersClassNames={{ hasData: "!bg-primary/20" }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">End date</label>
-                  <input
-                    type="date"
-                    value={endDateFilter}
-                    onChange={(e) => setEndDateFilter(e.target.value)}
-                    className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm"
-                  />
+                  <Popover>
+                    <PopoverTrigger className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm text-left">
+                      {endDateFilter
+                        ? new Date(endDateFilter + "T00:00:00").toLocaleDateString()
+                        : "Pick date"}
+                    </PopoverTrigger>
+                    <PopoverContent side="bottom" align="start" sideOffset={4} className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={endDateFilter ? new Date(endDateFilter + "T00:00:00") : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const y = date.getFullYear();
+                            const m = String(date.getMonth() + 1).padStart(2, "0");
+                            const d = String(date.getDate()).padStart(2, "0");
+                            setEndDateFilter(`${y}-${m}-${d}`);
+                          } else {
+                            setEndDateFilter("");
+                          }
+                        }}
+                        modifiers={{ hasData: (date: Date) => {
+                          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                          return logDateSet.has(key);
+                        }}}
+                        modifiersClassNames={{ hasData: "!bg-primary/20" }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="flex items-end">
                   <Button
@@ -559,57 +609,236 @@ export default function AnalyticsPage() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">
-                    Total Logs
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">{analytics.totals.totalLogs}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">
-                    Active Crops
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">
-                    {analytics.totals.uniqueCrops}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground flex items-center">
-                    Planning Sample
-                    <InfoTip text="How many planting assessments have been recorded. More assessments give you a clearer picture." />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">
-                    {analytics.planning.sampleSize}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground flex items-center">
-                    Planning Balance
-                    <InfoTip text="Are you planting too much or too little overall? Positive means you're underplanting, negative means overplanting. Close to 0% is ideal." />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">
-                    {formatPercent(analytics.planning.balance)}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+            {shouldShowCropCharts && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-muted-foreground">
+                        Total Logs
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold">{analytics.totals.totalLogs}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-muted-foreground">
+                        Active Crops
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold">
+                        {analytics.totals.uniqueCrops}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-muted-foreground flex items-center">
+                        Planning Sample
+                        <InfoTip text="How many planting assessments have been recorded. More assessments give you a clearer picture." />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold">
+                        {analytics.planning.sampleSize}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-muted-foreground flex items-center">
+                        Planning Balance
+                        <InfoTip text="Are you planting too much or too little overall? Positive means you're underplanting, negative means overplanting. Close to 0% is ideal." />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold">
+                        {formatPercent(analytics.planning.balance)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
 
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      Planning Distribution
+                      <InfoTip text="Overall split of your planting accuracy — how often you're under, on target, or over." />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={planningPieData}
+                            dataKey="value"
+                            nameKey="name"
+                            outerRadius={80}
+                          >
+                            {planningPieData.map((entry, index) => (
+                              <Cell
+                                key={`${entry.name}-${index}`}
+                                fill={PLANNING_PIE_COLORS[index % PLANNING_PIE_COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend
+                            formatter={(value) => {
+                              const total = planningPieData.reduce((sum, d) => sum + d.value, 0);
+                              const item = planningPieData.find((d) => d.name === value);
+                              const pct = item && total > 0 ? Math.round((item.value / total) * 100) : 0;
+                              return `${value} (${pct}%)`;
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {!shouldShowCropCharts && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    Planning Distribution
+                    <InfoTip text="Overall split of your planting accuracy — how often you're under, on target, or over." />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={planningPieData}
+                          dataKey="value"
+                          nameKey="name"
+                          outerRadius={80}
+                        >
+                          {planningPieData.map((entry, index) => (
+                            <Cell
+                              key={`${entry.name}-${index}`}
+                              fill={PLANNING_PIE_COLORS[index % PLANNING_PIE_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend
+                          formatter={(value) => {
+                            const total = planningPieData.reduce((sum, d) => sum + d.value, 0);
+                            const item = planningPieData.find((d) => d.name === value);
+                            const pct = item && total > 0 ? Math.round((item.value / total) * 100) : 0;
+                            return `${value} (${pct}%)`;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {shouldShowCropCharts && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    Over / Under Planning by Crop
+                    <InfoTip text="Which crops are you overplanting or underplanting? Helps you adjust quantities next season." />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={planningByCropData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(value) =>
+                            formatPercent(Math.abs(Number(value)))
+                          }
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="crop"
+                          width={92}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <Tooltip
+                          formatter={(value) =>
+                            formatPercent(Math.abs(Number(value)))
+                          }
+                        />
+                        <Legend />
+                        <Bar
+                          dataKey="under"
+                          stackId="planning"
+                          fill={CHART_COLORS[3]}
+                          name="Under"
+                        />
+                        <Bar
+                          dataKey="onTarget"
+                          stackId="planning"
+                          fill={CHART_COLORS[0]}
+                          name="On target"
+                        />
+                        <Bar
+                          dataKey="over"
+                          stackId="planning"
+                          fill={CHART_COLORS[4]}
+                          name="Over"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  Planning Balance Trend
+                  <InfoTip text="Is your planting accuracy improving over time? A line moving toward 0% means you're getting better at planting the right amount." />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={planningTrendData}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                      <XAxis
+                        dataKey="weekStart"
+                        tickFormatter={formatWeekLabel}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis tickFormatter={formatPercent} tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value) => formatPercent(Number(value))}
+                        labelFormatter={(value) =>
+                          `Week of ${formatWeekLabel(String(value))}`
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="balance"
+                        name="Under - Over"
+                        stroke={CHART_COLORS[2]}
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Logs Over Time + Logs by Crop */}
             <div
               className={`grid grid-cols-1 gap-6 ${
                 shouldShowCropCharts ? "lg:grid-cols-2" : ""
@@ -670,147 +899,6 @@ export default function AnalyticsPage() {
                 </Card>
               )}
             </div>
-
-            {!shouldShowCropCharts && (
-              <p className="text-xs text-muted-foreground">
-                Crop-level charts are hidden while a specific crop filter is selected.
-              </p>
-            )}
-
-            <div
-              className={`grid grid-cols-1 gap-6 ${
-                shouldShowCropCharts ? "lg:grid-cols-2" : ""
-              }`}
-            >
-              {shouldShowCropCharts && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                    Over / Under Planning by Crop
-                    <InfoTip text="Which crops are you overplanting or underplanting? Helps you adjust quantities next season." />
-                  </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={planningByCropData} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                          <XAxis
-                            type="number"
-                            tickFormatter={(value) =>
-                              formatPercent(Math.abs(Number(value)))
-                            }
-                          />
-                          <YAxis
-                            type="category"
-                            dataKey="crop"
-                            width={92}
-                            tick={{ fontSize: 12 }}
-                          />
-                          <Tooltip
-                            formatter={(value) =>
-                              formatPercent(Math.abs(Number(value)))
-                            }
-                          />
-                          <Legend />
-                          <Bar
-                            dataKey="under"
-                            stackId="planning"
-                            fill={CHART_COLORS[3]}
-                            name="Under"
-                          />
-                          <Bar
-                            dataKey="onTarget"
-                            stackId="planning"
-                            fill={CHART_COLORS[0]}
-                            name="On target"
-                          />
-                          <Bar
-                            dataKey="over"
-                            stackId="planning"
-                            fill={CHART_COLORS[4]}
-                            name="Over"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                  Planning Distribution
-                  <InfoTip text="Overall split of your planting accuracy — how often you're under, on target, or over." />
-                </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={planningPieData}
-                          dataKey="value"
-                          nameKey="name"
-                          outerRadius={110}
-                          label={({ name, percent }) =>
-                            `${name} ${Math.round((percent || 0) * 100)}%`
-                          }
-                        >
-                          {planningPieData.map((entry, index) => (
-                            <Cell
-                              key={`${entry.name}-${index}`}
-                              fill={PLANNING_PIE_COLORS[index % PLANNING_PIE_COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  Planning Balance Trend
-                  <InfoTip text="Is your planting accuracy improving over time? A line moving toward 0% means you're getting better at planting the right amount." />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={planningTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                      <XAxis
-                        dataKey="weekStart"
-                        tickFormatter={formatWeekLabel}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis tickFormatter={formatPercent} tick={{ fontSize: 12 }} />
-                      <Tooltip
-                        formatter={(value) => formatPercent(Number(value))}
-                        labelFormatter={(value) =>
-                          `Week of ${formatWeekLabel(String(value))}`
-                        }
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="balance"
-                        name="Under - Over"
-                        stroke={CHART_COLORS[2]}
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
           </>
         )}
 
