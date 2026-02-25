@@ -74,6 +74,38 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user } = useUser();
 
+  // {/* DEMO - REMOVE FOR PRODUCTION */}
+  const [showDemoSeedDialog, setShowDemoSeedDialog] = useState(false);
+  const [showDemoClearDialog, setShowDemoClearDialog] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const seedDemoData = useMutation(api.demo.seedDemoData);
+  const clearDemoData = useMutation(api.demo.clearDemoData);
+
+  const handleSeedDemo = async () => {
+    setDemoLoading(true);
+    try {
+      await seedDemoData();
+      setShowDemoSeedDialog(false);
+    } catch (error) {
+      console.error("Failed to seed demo data:", error);
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
+  const handleClearDemo = async () => {
+    setDemoLoading(true);
+    try {
+      await clearDemoData();
+      setShowDemoClearDialog(false);
+    } catch (error) {
+      console.error("Failed to clear demo data:", error);
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+  // {/* END DEMO */}
+
   // Get shared settings from Convex
   const settings = useQuery(api.sheets.getSettings);
 
@@ -172,7 +204,27 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold">Dashboard</h1>
             <p className="text-muted-foreground">{config?.spreadsheetName}</p>
           </div>
-          <UserButton />
+          <div className="flex items-center gap-2">
+            {/* DEMO - REMOVE FOR PRODUCTION */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDemoSeedDialog(true)}
+              className="text-xs"
+            >
+              Load Demo Data
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDemoClearDialog(true)}
+              className="text-xs text-destructive hover:text-destructive"
+            >
+              Clear Data
+            </Button>
+            {/* END DEMO */}
+            <UserButton />
+          </div>
         </div>
 
         {/* Main Action Buttons */}
@@ -491,6 +543,59 @@ export default function DashboardPage() {
             </Button>
           </Card>
         )}
+
+        {/* DEMO - REMOVE FOR PRODUCTION */}
+        <Dialog open={showDemoSeedDialog} onOpenChange={setShowDemoSeedDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Load Demo Data?</DialogTitle>
+              <DialogDescription>
+                This will populate the database with sample farm data for
+                demonstration purposes. Includes crops, qualifiers, and quality
+                logs.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowDemoSeedDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSeedDemo} disabled={demoLoading}>
+                {demoLoading ? "Loading..." : "Load Demo Data"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showDemoClearDialog} onOpenChange={setShowDemoClearDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Clear All Data?</DialogTitle>
+              <DialogDescription>
+                This will remove ALL data from the database (crops, qualifiers,
+                and quality logs). This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowDemoClearDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleClearDemo}
+                disabled={demoLoading}
+              >
+                {demoLoading ? "Clearing..." : "Clear All Data"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* END DEMO */}
       </div>
     </div>
   );

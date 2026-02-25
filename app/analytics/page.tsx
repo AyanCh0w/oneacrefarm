@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import { useUser } from "@clerk/nextjs";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -54,6 +59,23 @@ const CHART_COLORS = [
   "var(--color-chart-4)",
   "var(--color-chart-5)",
 ];
+
+// Fixed colors for the planning pie: orange (under), green (on target), red (over)
+const PLANNING_PIE_COLORS = ["#e8a838", "#4ade80", "#f87171"];
+
+// Tap-friendly info tooltip for explaining stats
+function InfoTip({ text }: { text: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs font-medium ml-1.5 shrink-0 cursor-pointer hover:bg-muted/80 active:scale-95 transition-transform">
+        ?
+      </PopoverTrigger>
+      <PopoverContent side="top" align="center" sideOffset={8} className="max-w-[240px]">
+        <p className="text-sm text-popover-foreground leading-relaxed">{text}</p>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
@@ -562,8 +584,9 @@ export default function AnalyticsPage() {
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">
+                  <CardTitle className="text-sm text-muted-foreground flex items-center">
                     Planning Sample
+                    <InfoTip text="How many planting assessments have been recorded. More assessments give you a clearer picture." />
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -574,16 +597,14 @@ export default function AnalyticsPage() {
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">
+                  <CardTitle className="text-sm text-muted-foreground flex items-center">
                     Planning Balance
+                    <InfoTip text="Are you planting too much or too little overall? Positive means you're underplanting, negative means overplanting. Close to 0% is ideal." />
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-semibold">
                     {formatPercent(analytics.planning.balance)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Under minus over
                   </p>
                 </CardContent>
               </Card>
@@ -664,7 +685,10 @@ export default function AnalyticsPage() {
               {shouldShowCropCharts && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Over / Under Planning by Crop</CardTitle>
+                    <CardTitle className="flex items-center">
+                    Over / Under Planning by Crop
+                    <InfoTip text="Which crops are you overplanting or underplanting? Helps you adjust quantities next season." />
+                  </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="h-80">
@@ -716,7 +740,10 @@ export default function AnalyticsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Planning Distribution</CardTitle>
+                  <CardTitle className="flex items-center">
+                  Planning Distribution
+                  <InfoTip text="Overall split of your planting accuracy — how often you're under, on target, or over." />
+                </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
@@ -734,7 +761,7 @@ export default function AnalyticsPage() {
                           {planningPieData.map((entry, index) => (
                             <Cell
                               key={`${entry.name}-${index}`}
-                              fill={CHART_COLORS[index % CHART_COLORS.length]}
+                              fill={PLANNING_PIE_COLORS[index % PLANNING_PIE_COLORS.length]}
                             />
                           ))}
                         </Pie>
@@ -749,7 +776,10 @@ export default function AnalyticsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Planning Balance Trend</CardTitle>
+                <CardTitle className="flex items-center">
+                  Planning Balance Trend
+                  <InfoTip text="Is your planting accuracy improving over time? A line moving toward 0% means you're getting better at planting the right amount." />
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
