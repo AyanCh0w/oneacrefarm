@@ -228,8 +228,8 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">{config?.spreadsheetName}</p>
+            <h1 className="text-2xl font-bold">Dashboard — <span className="font-normal text-muted-foreground">Hello, {user?.firstName ?? "there"}!</span></h1>
+            <p className="text-muted-foreground text-sm">{config?.spreadsheetName}</p>
           </div>
           <div className="flex items-center gap-2">
             {/* DEMO - REMOVE FOR PRODUCTION */}
@@ -410,7 +410,7 @@ export default function DashboardPage() {
           open={selectedLogId !== null}
           onOpenChange={(open) => !open && setSelectedLogId(null)}
         >
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl w-[90vw] max-h-[80vh] overflow-y-auto">
             {selectedLog && (
               <>
                 <DialogHeader>
