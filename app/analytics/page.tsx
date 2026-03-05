@@ -71,8 +71,15 @@ function InfoTip({ text }: { text: string }) {
       <PopoverTrigger className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs font-medium ml-1.5 shrink-0 cursor-pointer hover:bg-muted/80 active:scale-95 transition-transform">
         ?
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" sideOffset={8} className="max-w-[240px]">
-        <p className="text-sm text-popover-foreground leading-relaxed">{text}</p>
+      <PopoverContent
+        side="top"
+        align="center"
+        sideOffset={8}
+        className="max-w-[240px]"
+      >
+        <p className="text-sm text-popover-foreground leading-relaxed">
+          {text}
+        </p>
       </PopoverContent>
     </Popover>
   );
@@ -191,10 +198,7 @@ export default function AnalyticsPage() {
   );
   const analytics = useQuery(api.sheets.getAnalyticsOverview, analyticsFilters);
   const logDates = useQuery(api.sheets.getLogDates);
-  const logDateSet = useMemo(
-    () => new Set(logDates ?? []),
-    [logDates],
-  );
+  const logDateSet = useMemo(() => new Set(logDates ?? []), [logDates]);
   const deleteSheetByField = useMutation(api.sheets.deleteSheetByField);
 
   // Fetch spreadsheet last modified time
@@ -511,62 +515,98 @@ export default function AnalyticsPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Start date</label>
+                  <label className="text-xs text-muted-foreground">
+                    Start date
+                  </label>
                   <Popover>
                     <PopoverTrigger className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm text-left">
                       {startDateFilter
-                        ? new Date(startDateFilter + "T00:00:00").toLocaleDateString()
+                        ? new Date(
+                            startDateFilter + "T00:00:00",
+                          ).toLocaleDateString()
                         : "Pick date"}
                     </PopoverTrigger>
-                    <PopoverContent side="bottom" align="start" sideOffset={4} className="w-auto p-0">
+                    <PopoverContent
+                      side="bottom"
+                      align="start"
+                      sideOffset={4}
+                      className="w-auto p-0"
+                    >
                       <Calendar
                         mode="single"
-                        selected={startDateFilter ? new Date(startDateFilter + "T00:00:00") : undefined}
+                        selected={
+                          startDateFilter
+                            ? new Date(startDateFilter + "T00:00:00")
+                            : undefined
+                        }
                         onSelect={(date) => {
                           if (date) {
                             const y = date.getFullYear();
-                            const m = String(date.getMonth() + 1).padStart(2, "0");
+                            const m = String(date.getMonth() + 1).padStart(
+                              2,
+                              "0",
+                            );
                             const d = String(date.getDate()).padStart(2, "0");
                             setStartDateFilter(`${y}-${m}-${d}`);
                           } else {
                             setStartDateFilter("");
                           }
                         }}
-                        modifiers={{ hasData: (date: Date) => {
-                          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-                          return logDateSet.has(key);
-                        }}}
+                        modifiers={{
+                          hasData: (date: Date) => {
+                            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                            return logDateSet.has(key);
+                          },
+                        }}
                         modifiersClassNames={{ hasData: "!bg-primary/20" }}
                       />
                     </PopoverContent>
                   </Popover>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">End date</label>
+                  <label className="text-xs text-muted-foreground">
+                    End date
+                  </label>
                   <Popover>
                     <PopoverTrigger className="w-full h-9 rounded-md border border-border bg-background px-2 text-sm text-left">
                       {endDateFilter
-                        ? new Date(endDateFilter + "T00:00:00").toLocaleDateString()
+                        ? new Date(
+                            endDateFilter + "T00:00:00",
+                          ).toLocaleDateString()
                         : "Pick date"}
                     </PopoverTrigger>
-                    <PopoverContent side="bottom" align="start" sideOffset={4} className="w-auto p-0">
+                    <PopoverContent
+                      side="bottom"
+                      align="start"
+                      sideOffset={4}
+                      className="w-auto p-0"
+                    >
                       <Calendar
                         mode="single"
-                        selected={endDateFilter ? new Date(endDateFilter + "T00:00:00") : undefined}
+                        selected={
+                          endDateFilter
+                            ? new Date(endDateFilter + "T00:00:00")
+                            : undefined
+                        }
                         onSelect={(date) => {
                           if (date) {
                             const y = date.getFullYear();
-                            const m = String(date.getMonth() + 1).padStart(2, "0");
+                            const m = String(date.getMonth() + 1).padStart(
+                              2,
+                              "0",
+                            );
                             const d = String(date.getDate()).padStart(2, "0");
                             setEndDateFilter(`${y}-${m}-${d}`);
                           } else {
                             setEndDateFilter("");
                           }
                         }}
-                        modifiers={{ hasData: (date: Date) => {
-                          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-                          return logDateSet.has(key);
-                        }}}
+                        modifiers={{
+                          hasData: (date: Date) => {
+                            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                            return logDateSet.has(key);
+                          },
+                        }}
                         modifiersClassNames={{ hasData: "!bg-primary/20" }}
                       />
                     </PopoverContent>
@@ -604,7 +644,8 @@ export default function AnalyticsPage() {
         ) : analytics.totals.totalLogs === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-muted-foreground">
-              No quality logs yet. Add entries from Log Data to populate analytics.
+              No quality logs yet. Add entries from Log Data to populate
+              analytics.
             </p>
           </Card>
         ) : (
@@ -619,7 +660,9 @@ export default function AnalyticsPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-3xl font-bold">{analytics.totals.totalLogs}</p>
+                      <p className="text-3xl font-bold">
+                        {analytics.totals.totalLogs}
+                      </p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -637,7 +680,7 @@ export default function AnalyticsPage() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm text-muted-foreground flex items-center">
-                        Planning Sample
+                        Planting Sample
                         <InfoTip text="How many planting assessments have been recorded. More assessments give you a clearer picture." />
                       </CardTitle>
                     </CardHeader>
@@ -650,7 +693,7 @@ export default function AnalyticsPage() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm text-muted-foreground flex items-center">
-                        Planning Balance
+                        Planting Balance
                         <InfoTip text="Are you planting too much or too little overall? Positive means you're underplanting, negative means overplanting. Close to 0% is ideal." />
                       </CardTitle>
                     </CardHeader>
@@ -665,7 +708,7 @@ export default function AnalyticsPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      Planning Distribution
+                      Planting Distribution
                       <InfoTip text="Overall split of your planting accuracy — how often you're under, on target, or over." />
                     </CardTitle>
                   </CardHeader>
@@ -682,16 +725,28 @@ export default function AnalyticsPage() {
                             {planningPieData.map((entry, index) => (
                               <Cell
                                 key={`${entry.name}-${index}`}
-                                fill={PLANNING_PIE_COLORS[index % PLANNING_PIE_COLORS.length]}
+                                fill={
+                                  PLANNING_PIE_COLORS[
+                                    index % PLANNING_PIE_COLORS.length
+                                  ]
+                                }
                               />
                             ))}
                           </Pie>
                           <Tooltip />
                           <Legend
                             formatter={(value) => {
-                              const total = planningPieData.reduce((sum, d) => sum + d.value, 0);
-                              const item = planningPieData.find((d) => d.name === value);
-                              const pct = item && total > 0 ? Math.round((item.value / total) * 100) : 0;
+                              const total = planningPieData.reduce(
+                                (sum, d) => sum + d.value,
+                                0,
+                              );
+                              const item = planningPieData.find(
+                                (d) => d.name === value,
+                              );
+                              const pct =
+                                item && total > 0
+                                  ? Math.round((item.value / total) * 100)
+                                  : 0;
                               return `${value} (${pct}%)`;
                             }}
                           />
@@ -707,7 +762,7 @@ export default function AnalyticsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    Planning Distribution
+                    Planting Distribution
                     <InfoTip text="Overall split of your planting accuracy — how often you're under, on target, or over." />
                   </CardTitle>
                 </CardHeader>
@@ -724,16 +779,28 @@ export default function AnalyticsPage() {
                           {planningPieData.map((entry, index) => (
                             <Cell
                               key={`${entry.name}-${index}`}
-                              fill={PLANNING_PIE_COLORS[index % PLANNING_PIE_COLORS.length]}
+                              fill={
+                                PLANNING_PIE_COLORS[
+                                  index % PLANNING_PIE_COLORS.length
+                                ]
+                              }
                             />
                           ))}
                         </Pie>
                         <Tooltip />
                         <Legend
                           formatter={(value) => {
-                            const total = planningPieData.reduce((sum, d) => sum + d.value, 0);
-                            const item = planningPieData.find((d) => d.name === value);
-                            const pct = item && total > 0 ? Math.round((item.value / total) * 100) : 0;
+                            const total = planningPieData.reduce(
+                              (sum, d) => sum + d.value,
+                              0,
+                            );
+                            const item = planningPieData.find(
+                              (d) => d.name === value,
+                            );
+                            const pct =
+                              item && total > 0
+                                ? Math.round((item.value / total) * 100)
+                                : 0;
                             return `${value} (${pct}%)`;
                           }}
                         />
@@ -748,7 +815,7 @@ export default function AnalyticsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    Over / Under Planning by Crop
+                    Over / Under Planting by Crop
                     <InfoTip text="Which crops are you overplanting or underplanting? Helps you adjust quantities next season." />
                   </CardTitle>
                 </CardHeader>
@@ -803,7 +870,7 @@ export default function AnalyticsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  Planning Balance Trend
+                  Planting Balance Trend
                   <InfoTip text="Is your planting accuracy improving over time? A line moving toward 0% means you're getting better at planting the right amount." />
                 </CardTitle>
               </CardHeader>
@@ -817,7 +884,10 @@ export default function AnalyticsPage() {
                         tickFormatter={formatWeekLabel}
                         tick={{ fontSize: 12 }}
                       />
-                      <YAxis tickFormatter={formatPercent} tick={{ fontSize: 12 }} />
+                      <YAxis
+                        tickFormatter={formatPercent}
+                        tick={{ fontSize: 12 }}
+                      />
                       <Tooltip
                         formatter={(value) => formatPercent(Number(value))}
                         labelFormatter={(value) =>
@@ -889,9 +959,16 @@ export default function AnalyticsPage() {
                         <BarChart data={topCropData}>
                           <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
                           <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                          <YAxis
+                            allowDecimals={false}
+                            tick={{ fontSize: 12 }}
+                          />
                           <Tooltip />
-                          <Bar dataKey="value" name="Logs" fill={CHART_COLORS[1]} />
+                          <Bar
+                            dataKey="value"
+                            name="Logs"
+                            fill={CHART_COLORS[1]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -925,7 +1002,9 @@ export default function AnalyticsPage() {
                       <p>Last synced: {formatLastSync(lastSyncTime)}</p>
                     )}
                     {!isLoadingMetadata && sheetLastModified && (
-                      <p>Sheet edited: {formatLastModified(sheetLastModified)}</p>
+                      <p>
+                        Sheet edited: {formatLastModified(sheetLastModified)}
+                      </p>
                     )}
                   </div>
 
@@ -990,7 +1069,10 @@ export default function AnalyticsPage() {
                   Managed by {config.adminEmail}
                 </span>
               )}
-              <Button variant="outline" onClick={() => setShowSyncDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowSyncDialog(false)}
+              >
                 Close
               </Button>
               {isAdmin && syncProgress.status !== "syncing" && (
