@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { Inter, JetBrains_Mono } from "next/font/google";
@@ -19,6 +19,17 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Crop Logger",
   description: "One Acre Farm Crop Logger",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Crop Logger",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -42,6 +53,7 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <head>
+          <link rel="apple-touch-icon" href="/icons/icon-192.png" />
           <script
             dangerouslySetInnerHTML={{
               __html: `
@@ -54,6 +66,11 @@ export default function RootLayout({
                       document.documentElement.classList.remove('dark');
                     }
                   } catch (e) {}
+                  if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', function() {
+                      navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' });
+                    });
+                  }
                 })();
               `,
             }}
