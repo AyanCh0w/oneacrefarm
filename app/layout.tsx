@@ -53,7 +53,7 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <head>
-          <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+          <link rel="apple-touch-icon" href="/appicons/Assets.xcassets/AppIcon.appiconset/180.png" />
           <script
             dangerouslySetInnerHTML={{
               __html: `
