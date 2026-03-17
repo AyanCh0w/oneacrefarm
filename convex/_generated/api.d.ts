@@ -8,7 +8,6 @@
  * @module
  */
 
-import type * as demo from "../demo.js";
 import type * as sheets from "../sheets.js";
 
 import type {
@@ -18,7 +17,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  demo: typeof demo;
   sheets: typeof sheets;
 }>;
 

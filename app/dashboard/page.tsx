@@ -200,6 +200,12 @@ export default function DashboardPage() {
             <p className="text-muted-foreground text-sm">{config?.spreadsheetName}</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="destructive"
+              onClick={() => router.push("/help")}
+            >
+              Help
+            </Button>
             <UserButton />
           </div>
         </div>
