@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -7,6 +6,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+const linkButtonBase =
+  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg border border-transparent px-2.5 text-sm font-medium transition-all";
+const defaultLinkButton = `${linkButtonBase} bg-primary text-primary-foreground`;
+const outlineLinkButton = `${linkButtonBase} border-border bg-background hover:bg-muted hover:text-foreground`;
+const secondaryLinkButton = `${linkButtonBase} bg-secondary text-secondary-foreground hover:bg-secondary/80`;
 
 const quickStartSteps = [
   {
@@ -97,12 +103,12 @@ export default function HelpPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <Link href="/dashboard">Back to Dashboard</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/log-data">Log Data</Link>
-              </Button>
+              <Link href="/dashboard" className={outlineLinkButton}>
+                Back to Dashboard
+              </Link>
+              <Link href="/log-data" className={defaultLinkButton}>
+                Log Data
+              </Link>
             </div>
           </div>
 
@@ -155,15 +161,24 @@ export default function HelpPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button asChild variant="outline" className="w-full justify-center">
-                <Link href="/dashboard">Open dashboard</Link>
-              </Button>
-              <Button asChild className="w-full justify-center">
-                <Link href="/log-data">Start logging</Link>
-              </Button>
-              <Button asChild variant="secondary" className="w-full justify-center">
-                <Link href="/analytics">View analysis and sync tools</Link>
-              </Button>
+              <Link
+                href="/dashboard"
+                className={cn(outlineLinkButton, "w-full justify-center")}
+              >
+                Open dashboard
+              </Link>
+              <Link
+                href="/log-data"
+                className={cn(defaultLinkButton, "w-full justify-center")}
+              >
+                Start logging
+              </Link>
+              <Link
+                href="/analytics"
+                className={cn(secondaryLinkButton, "w-full justify-center")}
+              >
+                View analysis and sync tools
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -281,12 +296,12 @@ export default function HelpPage() {
                 interface.
               </p>
               <div className="flex flex-wrap gap-3 pt-1">
-                <Button asChild variant="outline" className="justify-center">
-                  <Link href="/dashboard">Return to dashboard</Link>
-                </Button>
-                <Button asChild variant="secondary" className="justify-center">
-                  <Link href="/analytics">Manage sync settings</Link>
-                </Button>
+                <Link href="/dashboard" className={outlineLinkButton}>
+                  Return to dashboard
+                </Link>
+                <Link href="/analytics" className={secondaryLinkButton}>
+                  Manage sync settings
+                </Link>
               </div>
             </CardContent>
           </Card>

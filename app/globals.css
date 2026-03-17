@@ -55,6 +55,8 @@ body {
 }
 
 :root {
+  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
   --radius: 0.45rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.147 0.004 49.25);

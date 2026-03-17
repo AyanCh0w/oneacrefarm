@@ -2,21 +2,15 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import { ThemeSync } from "@/components/theme-sync";
-import { Button } from "@/components/ui/button";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-});
+const footerLinkBase =
+  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg border border-transparent px-2.5 text-sm font-medium transition-all";
+const footerOutlineLink = `${footerLinkBase} border-border bg-background hover:bg-muted hover:text-foreground`;
+const footerSecondaryLink = `${footerLinkBase} bg-secondary text-secondary-foreground hover:bg-secondary/80`;
+const footerHelpLink = `${footerLinkBase} bg-destructive/10 text-destructive hover:bg-destructive/20`;
 
 export const metadata: Metadata = {
   title: "Crop Logger",
@@ -79,7 +73,7 @@ export default function RootLayout({
           />
         </head>
         <body
-          className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground`}
+          className="font-sans antialiased bg-background text-foreground"
         >
           <ThemeSync />
           <Providers>
@@ -100,15 +94,15 @@ export default function RootLayout({
                     </div>
 
                     <div className="flex flex-wrap gap-3">
-                      <Button asChild variant="outline" className="justify-center">
-                        <Link href="/dashboard">Dashboard</Link>
-                      </Button>
-                      <Button asChild variant="secondary" className="justify-center">
-                        <Link href="/log-data">Log Data</Link>
-                      </Button>
-                      <Button asChild variant="destructive" className="justify-center">
-                        <Link href="/help">Help</Link>
-                      </Button>
+                      <Link href="/dashboard" className={footerOutlineLink}>
+                        Dashboard
+                      </Link>
+                      <Link href="/log-data" className={footerSecondaryLink}>
+                        Log Data
+                      </Link>
+                      <Link href="/help" className={footerHelpLink}>
+                        Help
+                      </Link>
                     </div>
                   </div>
 
