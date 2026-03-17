@@ -15,7 +15,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="pt-4">
+        <div className="flex flex-col items-center gap-3 pt-4">
           <SignedOut>
             <SignInButton mode="modal">
               <Button size="lg" className="w-full sm:w-auto px-8">
@@ -31,6 +31,12 @@ export default function Home() {
               </Button>
             </Link>
           </SignedIn>
+
+          <Link href="/help" className="w-full sm:w-auto">
+            <Button size="lg" variant="outline" className="w-full px-8">
+              Help
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
