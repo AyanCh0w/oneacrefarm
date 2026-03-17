@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Crop Logger – One Acre Farm",
-    short_name: "Crop Logger",
+    name: "One Acre Farm Crop Logger",
+    short_name: "One Acre",
     description: "One Acre Farm crop quality tracking and data collection",
     start_url: "/dashboard",
     display: "standalone",
@@ -12,17 +12,17 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "any",
     icons: [
       {
-        src: "/appicons/android/mipmap-xxxhdpi/Crop Logger.png",
+        src: "/AppIcons/android/mipmap-xxxhdpi/Crop Logger.png",
         sizes: "192x192",
         type: "image/png",
       },
       {
-        src: "/appicons/Assets.xcassets/AppIcon.appiconset/1024.png",
+        src: "/AppIcons/Assets.xcassets/AppIcon.appiconset/1024.png",
         sizes: "1024x1024",
         type: "image/png",
       },
       {
-        src: "/appicons/android/mipmap-xxxhdpi/Crop Logger.png",
+        src: "/AppIcons/android/mipmap-xxxhdpi/Crop Logger.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "maskable",

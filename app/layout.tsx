@@ -13,13 +13,28 @@ const footerSecondaryLink = `${footerLinkBase} bg-secondary text-secondary-foreg
 const footerHelpLink = `${footerLinkBase} bg-destructive/10 text-destructive hover:bg-destructive/20`;
 
 export const metadata: Metadata = {
-  title: "Crop Logger",
+  title: "One Acre Farm Crop Logger",
   description: "One Acre Farm Crop Logger",
   manifest: "/manifest.webmanifest",
+  icons: {
+    apple: "/AppIcons/Assets.xcassets/AppIcon.appiconset/180.png",
+    icon: [
+      {
+        url: "/AppIcons/android/mipmap-xxxhdpi/Crop Logger.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/AppIcons/Assets.xcassets/AppIcon.appiconset/1024.png",
+        sizes: "1024x1024",
+        type: "image/png",
+      },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Crop Logger",
+    title: "One Acre",
   },
 };
 
@@ -49,7 +64,7 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <head>
-          <link rel="apple-touch-icon" href="/appicons/Assets.xcassets/AppIcon.appiconset/180.png" />
+          <link rel="apple-touch-icon" href="/AppIcons/Assets.xcassets/AppIcon.appiconset/180.png" />
           <script
             dangerouslySetInnerHTML={{
               __html: `
