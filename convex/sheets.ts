@@ -541,6 +541,24 @@ export const getRecentQualityLogs = query({
   },
 });
 
+// Get quality logs recorded within an assessment date range
+export const getQualityLogsInDateRange = query({
+  args: {
+    startTimestamp: v.number(),
+    endTimestamp: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("qualityLogs")
+      .withIndex("by_assessment_date", (q) =>
+        q
+          .gte("assessmentDate", args.startTimestamp)
+          .lte("assessmentDate", args.endTimestamp)
+      )
+      .collect();
+  },
+});
+
 // Get quality log stats (aggregated data for charts)
 export const getQualityLogStats = query({
   handler: async (ctx) => {
