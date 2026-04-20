@@ -7,13 +7,17 @@ const isProtectedRoute = createRouteMatcher([
   "/api/(.*)",
 ]);
 
+const isPublicRoute = createRouteMatcher([
+  "/api/quality-logs/export",
+]);
+
 const isPendingRoute = createRouteMatcher(["/pending-approval"]);
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims } = await auth();
 
   // If accessing protected routes, require authentication
-  if (isProtectedRoute(req)) {
+  if (isProtectedRoute(req) && !isPublicRoute(req)) {
     await auth.protect();
   }
 
