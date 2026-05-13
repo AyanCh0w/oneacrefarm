@@ -152,9 +152,13 @@ export default function DashboardPage() {
     : [];
   const uniqueCropTypes = uniqueCropTypeNames.length;
 
-  // Get all crop names (crop + variety) for the Total Crops detail
-  const allCropNames = crops
-    ? crops.map((c) => c.variety ? `${c.crop}: ${c.variety}` : c.crop).sort()
+  // Get unique crop names (crop + variety) for the Total Crops detail
+  const uniqueCropNames = crops
+    ? [
+        ...new Set(
+          crops.map((c) => (c.variety ? `${c.crop}: ${c.variety}` : c.crop)),
+        ),
+      ].sort()
     : [];
 
   // No config - show setup prompt (admin) or waiting message (non-admin)
@@ -233,12 +237,12 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatsCard
             title="Total Crops"
-            value={crops?.length ?? 0}
+            value={uniqueCropNames.length}
             subtitle={
               uniqueFields ? `${uniqueFields.length} fields` : undefined
             }
             loading={crops === undefined}
-            detailItems={allCropNames}
+            detailItems={uniqueCropNames}
           />
           <StatsCard
             title="Crop Types"
