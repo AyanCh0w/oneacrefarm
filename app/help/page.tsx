@@ -35,6 +35,7 @@ const quickStartSteps = [
 const appFeatures = [
   "View current plantings by field and bed",
   "Log quality assessments with crop-specific questions",
+  "Check qualifier coverage for every planted crop",
   "Track replanting with automatic warning badges",
   "Keep a historical record of quality logs over time",
 ];
@@ -48,6 +49,7 @@ const spreadsheetReads = [
 
 const tips = [
   "Keep the Qualifiers sheet up to date so forms show the right questions.",
+  "Use qualifier coverage after each sync to find crops that are missing crop-specific questions.",
   "Re-sync after editing Google Sheets because the app reads from its synced copy.",
   "Watch for warning badges on replanted beds so you can spot crop changes quickly.",
   "Use the app on a phone or tablet while walking the fields for faster logging.",
@@ -179,6 +181,12 @@ export default function HelpPage() {
               >
                 View analysis and sync tools
               </Link>
+              <Link
+                href="/qualifiers"
+                className={cn(outlineLinkButton, "w-full justify-center")}
+              >
+                Check qualifier coverage
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -232,6 +240,52 @@ export default function HelpPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Qualifier coverage</CardTitle>
+            <CardDescription>
+              Use this when you want to confirm every planted crop has the
+              assessment questions it needs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-[1fr_0.7fr]">
+            <div className="space-y-3 text-sm leading-6 text-muted-foreground">
+              <p>
+                The coverage page compares synced crop plantings against the
+                synced Qualifiers sheet. It groups plantings by crop, shows the
+                fields and beds where each crop appears, and flags crops that do
+                not have a matching crop-specific qualifier.
+              </p>
+              <p>
+                Location-specific qualifiers are checked the same way the
+                logging form checks them: high tunnel, greenhouse, and field
+                matches are preferred first, then the app falls back to a
+                generic crop qualifier when one exists.
+              </p>
+              <p>
+                Open a crop from the coverage page to see the universal
+                questions and any crop-specific questions that will appear when
+                logging quality data.
+              </p>
+            </div>
+            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
+              <div className="space-y-2">
+                <p className="text-sm font-semibold">Best time to check</p>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  After syncing a spreadsheet or after adding new crops to the
+                  planting sheets.
+                </p>
+              </div>
+              <Link
+                href="/qualifiers"
+                className={cn(defaultLinkButton, "w-full justify-center")}
+              >
+                Open qualifier coverage
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
