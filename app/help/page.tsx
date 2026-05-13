@@ -14,6 +14,37 @@ const defaultLinkButton = `${linkButtonBase} bg-primary text-primary-foreground`
 const outlineLinkButton = `${linkButtonBase} border-border bg-background hover:bg-muted hover:text-foreground`;
 const secondaryLinkButton = `${linkButtonBase} bg-secondary text-secondary-foreground hover:bg-secondary/80`;
 
+const configurationActions = [
+  {
+    title: "Spreadsheet setup",
+    description: "Choose the shared planting spreadsheet and field sheets.",
+    href: "/onboarding",
+    label: "Open setup",
+    variant: "default",
+  },
+  {
+    title: "Sync and analytics",
+    description: "Refresh Google Sheets data and review planting patterns.",
+    href: "/analytics",
+    label: "Manage sync",
+    variant: "secondary",
+  },
+  {
+    title: "Universal qualifiers",
+    description: "Edit questions that appear on every quality log form.",
+    href: "/qualifiers",
+    label: "Edit qualifiers",
+    variant: "outline",
+  },
+  {
+    title: "Field logging",
+    description: "Open the mobile-friendly quality logging workflow.",
+    href: "/log-data",
+    label: "Log data",
+    variant: "outline",
+  },
+];
+
 const quickStartSteps = [
   {
     title: "Sign in",
@@ -83,6 +114,12 @@ const privacyCards = [
 ];
 
 export default function HelpPage() {
+  const getActionClassName = (variant: string) => {
+    if (variant === "default") return defaultLinkButton;
+    if (variant === "secondary") return secondaryLinkButton;
+    return outlineLinkButton;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
@@ -94,12 +131,12 @@ export default function HelpPage() {
               </p>
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-                  Help for using the One Acre Farm dashboard
+                  Configuration and app menu
                 </h1>
                 <p className="text-base leading-7 text-muted-foreground">
-                  This guide explains what the app does, how data gets synced,
-                  what happens when you log crop quality, and what to expect
-                  from permissions and privacy.
+                  Use this page to get to setup, sync, qualifier management,
+                  and field logging. The longer reference notes are below the
+                  menu.
                 </p>
               </div>
             </div>
@@ -115,12 +152,28 @@ export default function HelpPage() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {appFeatures.map((feature) => (
+            {configurationActions.map((action) => (
               <div
-                key={feature}
-                className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm leading-6 text-muted-foreground"
+                key={action.title}
+                className="flex flex-col justify-between gap-4 rounded-2xl border border-border/60 bg-background/70 p-4"
               >
-                <span className="font-medium text-foreground">{feature}</span>
+                <div className="space-y-1">
+                  <h2 className="font-medium text-foreground">
+                    {action.title}
+                  </h2>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {action.description}
+                  </p>
+                </div>
+                <Link
+                  href={action.href}
+                  className={cn(
+                    getActionClassName(action.variant),
+                    "w-full justify-center",
+                  )}
+                >
+                  {action.label}
+                </Link>
               </div>
             ))}
           </div>
@@ -129,10 +182,9 @@ export default function HelpPage() {
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <Card>
             <CardHeader>
-              <CardTitle>Getting started</CardTitle>
+              <CardTitle>Setup checklist</CardTitle>
               <CardDescription>
-                The normal setup flow from first sign-in through your first
-                quality log.
+                The shortest path from first sign-in to usable field logs.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -157,7 +209,7 @@ export default function HelpPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Quick actions</CardTitle>
+              <CardTitle>Main menu</CardTitle>
               <CardDescription>
                 Jump straight to the part of the app you need.
               </CardDescription>
@@ -185,11 +237,38 @@ export default function HelpPage() {
                 href="/qualifiers"
                 className={cn(outlineLinkButton, "w-full justify-center")}
               >
-                Check qualifier coverage
+                Manage qualifiers
               </Link>
             </CardContent>
           </Card>
         </div>
+
+        <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+          <p className="text-sm font-semibold">Reference guide</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            The sections below are the README-style explanation of what the app
+            reads, how qualifier matching works, and what data is stored.
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>What the app can do</CardTitle>
+            <CardDescription>
+              A compact feature reference for the current dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {appFeatures.map((feature) => (
+              <div
+                key={feature}
+                className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm leading-6 text-muted-foreground"
+              >
+                <span className="font-medium text-foreground">{feature}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>

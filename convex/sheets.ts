@@ -468,6 +468,60 @@ export const getAllUniversalQualifiers = query({
   },
 });
 
+// Create or update a single universal qualifier from the in-app editor.
+export const saveUniversalQualifier = mutation({
+  args: {
+    id: v.optional(v.id("universalQualifiers")),
+    name: v.string(),
+    options: v.array(v.string()),
+    order: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const name = args.name.trim();
+    const options = args.options
+      .map((option) => option.trim())
+      .filter((option) => option.length > 0);
+
+    if (name.length === 0) {
+      throw new Error("Question name is required");
+    }
+
+    if (options.length === 0) {
+      throw new Error("At least one answer option is required");
+    }
+
+    if (args.id) {
+      await ctx.db.patch(args.id, {
+        name,
+        options,
+        order: args.order,
+        lastSynced: Date.now(),
+      });
+      return { success: true, action: "updated", id: args.id };
+    }
+
+    const id = await ctx.db.insert("universalQualifiers", {
+      name,
+      options,
+      order: args.order,
+      lastSynced: Date.now(),
+    });
+
+    return { success: true, action: "created", id };
+  },
+});
+
+// Delete a universal qualifier from the in-app editor.
+export const deleteUniversalQualifier = mutation({
+  args: {
+    id: v.id("universalQualifiers"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+    return { success: true };
+  },
+});
+
 // ============ Quality Logs ============
 
 // Create a new quality log entry

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,13 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface Crop {
@@ -40,6 +43,14 @@ interface Qualifier {
     options: string[];
     isUniversal?: boolean;
   }[];
+  lastSynced: number;
+}
+
+interface UniversalQualifier {
+  _id: Id<"universalQualifiers">;
+  name: string;
+  options: string[];
+  order: number;
   lastSynced: number;
 }
 
@@ -144,6 +155,226 @@ function FieldList({ plantings }: { plantings: Crop[] }) {
   );
 }
 
+function UniversalQualifierEditor({
+  qualifiers,
+}: {
+  qualifiers: UniversalQualifier[] | undefined;
+}) {
+  const saveUniversalQualifier = useMutation(api.sheets.saveUniversalQualifier);
+  const deleteUniversalQualifier = useMutation(
+    api.sheets.deleteUniversalQualifier,
+  );
+  const [editing, setEditing] = useState<UniversalQualifier | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [optionsText, setOptionsText] = useState("");
+  const [order, setOrder] = useState("0");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const openEditor = (qualifier?: UniversalQualifier) => {
+    setError(null);
+    if (qualifier) {
+      setEditing(qualifier);
+      setIsCreating(false);
+      setName(qualifier.name);
+      setOptionsText(qualifier.options.join("\n"));
+      setOrder(String(qualifier.order));
+      return;
+    }
+
+    setEditing(null);
+    setIsCreating(true);
+    setName("");
+    setOptionsText("");
+    setOrder(String((qualifiers?.length ?? 0) + 1));
+  };
+
+  const closeEditor = () => {
+    setEditing(null);
+    setIsCreating(false);
+    setError(null);
+    setSaving(false);
+  };
+
+  const handleSave = async () => {
+    const options = optionsText
+      .split(/\r?\n|,/)
+      .map((option) => option.trim())
+      .filter(Boolean);
+    const parsedOrder = Number(order);
+
+    if (!Number.isFinite(parsedOrder)) {
+      setError("Order must be a number.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await saveUniversalQualifier({
+        id: editing?._id,
+        name,
+        options,
+        order: parsedOrder,
+      });
+      closeEditor();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save question.");
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (qualifier: UniversalQualifier) => {
+    const confirmed = window.confirm(
+      `Delete "${qualifier.name}" from every crop assessment form?`,
+    );
+
+    if (!confirmed) return;
+
+    await deleteUniversalQualifier({ id: qualifier._id });
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle>Universal Qualifiers</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Edit the questions that appear on every crop quality form.
+              </p>
+            </div>
+            <Button type="button" onClick={() => openEditor()}>
+              Add Question
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {qualifiers === undefined ? (
+            <div className="space-y-3">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : qualifiers.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+              No universal questions are configured yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {qualifiers.map((qualifier) => (
+                <div
+                  key={qualifier._id}
+                  className="rounded-lg border border-border bg-card p-4"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-semibold">{qualifier.name}</h2>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          Order {qualifier.order}
+                        </span>
+                      </div>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {qualifier.options.join(", ")}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => openEditor(qualifier)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => handleDelete(qualifier)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={isCreating || editing !== null}
+        onOpenChange={(open) => !open && closeEditor()}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editing ? "Edit Universal Qualifier" : "Add Universal Qualifier"}
+            </DialogTitle>
+            <DialogDescription>
+              These answers are shown as buttons in every crop assessment form.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="universal-name">Question</Label>
+              <Input
+                id="universal-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Planting quantity?"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="universal-options">Answer options</Label>
+              <Textarea
+                id="universal-options"
+                value={optionsText}
+                onChange={(event) => setOptionsText(event.target.value)}
+                placeholder={"Not enough\nOn target\nToo much"}
+                className="min-h-28"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter one option per line. Commas also work for quick edits.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="universal-order">Display order</Label>
+              <Input
+                id="universal-order"
+                type="number"
+                value={order}
+                onChange={(event) => setOrder(event.target.value)}
+              />
+            </div>
+
+            {error && (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeEditor}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function QualifiersPage() {
   const router = useRouter();
   const crops = useQuery(api.sheets.getAllCrops);
@@ -223,15 +454,17 @@ export default function QualifiersPage() {
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Qualifier Coverage</h1>
+            <h1 className="text-2xl font-bold">Qualifiers</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Check which planted crops have crop-specific qualifier questions.
+              Configure universal questions and check crop-specific coverage.
             </p>
           </div>
           <Button variant="outline" onClick={() => router.push("/dashboard")}>
             Back to Dashboard
           </Button>
         </div>
+
+        <UniversalQualifierEditor qualifiers={universalQualifiers} />
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Card>
@@ -297,7 +530,12 @@ export default function QualifiersPage() {
         <Card>
           <CardHeader className="gap-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <CardTitle>Planted Crops</CardTitle>
+              <div>
+                <CardTitle>Crop Qualifier Coverage</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Find planted crops that are missing crop-specific questions.
+                </p>
+              </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   value={search}
