@@ -125,18 +125,20 @@ function getCombinedAssessments(
   qualifier: Qualifier | null,
   universalQualifiers: UniversalQualifier[] | undefined,
 ): { name: string; options: string[] }[] {
-  // Get universal assessments (already sorted by order)
-  const universalAssessments =
-    universalQualifiers?.map((uq) => ({
-      name: uq.name,
-      options: uq.options,
-    })) || [];
+  const assessmentsByName = new Map<string, { name: string; options: string[] }>();
 
-  // Get crop-specific assessments
-  const cropSpecificAssessments = qualifier?.assessments || [];
+  for (const universalQualifier of universalQualifiers ?? []) {
+    assessmentsByName.set(universalQualifier.name, {
+      name: universalQualifier.name,
+      options: universalQualifier.options,
+    });
+  }
 
-  // Return universal assessments first, then crop-specific
-  return [...universalAssessments, ...cropSpecificAssessments];
+  for (const assessment of qualifier?.assessments ?? []) {
+    assessmentsByName.set(assessment.name, assessment);
+  }
+
+  return [...assessmentsByName.values()];
 }
 
 // Skeleton components

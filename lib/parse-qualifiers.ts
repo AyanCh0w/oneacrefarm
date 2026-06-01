@@ -60,8 +60,8 @@ function parseCropNameAndLocation(fullName: string): { name: string; location?: 
  * Structure:
  * - Column A contains vegetable names (marks start of new vegetable)
  *   - Names may include location suffix (e.g., "Cucumbers, HT")
- * - Columns B, C, D, E... contain questions in the first row of each vegetable
- * - Options are listed below each question in the same column
+ * - Columns B, C, D, E... contain assessment headers in the first row of each vegetable
+ * - Options are listed below each assessment in the same column
  * - Options may have "- " prefix which is stripped
  *
  * Universal Qualifiers:
@@ -111,12 +111,12 @@ export function parseQualifiersSheet(data: string[][]): {
         .map((n) => n.trim())
         .filter((n) => n.length > 0);
 
-      // Extract questions from columns B onwards (row with vegetable name)
+      // Extract assessment headers from columns B onwards (row with vegetable name).
+      // Some source headers are labels like "Head size" or "Timing", not questions.
       currentAssessments = [];
       for (let col = 1; col < row.length; col++) {
         const cell = row[col]?.trim() || "";
-        // Questions end with "?"
-        if (cell && cell.endsWith("?")) {
+        if (cell && !cell.startsWith("-")) {
           currentAssessments.push({
             name: cell,
             options: [],
