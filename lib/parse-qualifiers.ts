@@ -15,6 +15,16 @@ export interface UniversalQualifier {
   order: number; // Display order
 }
 
+interface ParsedAssessment extends Assessment {
+  sourceColumn: number;
+}
+
+interface ParsedVegetableData {
+  name: string;
+  location?: string;
+  assessments: ParsedAssessment[];
+}
+
 /**
  * Parse crop name and extract location suffix if present.
  * Examples:
@@ -55,7 +65,7 @@ function parseCropNameAndLocation(fullName: string): { name: string; location?: 
  * - Options may have "- " prefix which is stripped
  *
  * Universal Qualifiers:
- * - Assessments that appear in ALL crops are extracted separately
+ * - Assessments that appear in ALL crops with the same options are extracted separately
  * - Returned in universalQualifiers array with display order
  * - Removed from individual crop qualifiers to avoid duplication
  */
@@ -65,9 +75,9 @@ export function parseQualifiersSheet(data: string[][]): {
 } {
   if (data.length === 0) return { vegetables: [], universalQualifiers: [] };
 
-  const vegetables: VegetableData[] = [];
+  const vegetables: ParsedVegetableData[] = [];
   let currentVegetableNames: string[] = [];
-  let currentAssessments: Assessment[] = [];
+  let currentAssessments: ParsedAssessment[] = [];
 
   for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
     const row = data[rowIndex];
@@ -88,6 +98,7 @@ export function parseQualifiersSheet(data: string[][]): {
             assessments: currentAssessments.map((a) => ({
               name: a.name,
               options: [...a.options],
+              sourceColumn: a.sourceColumn,
             })),
           });
         }
@@ -109,6 +120,7 @@ export function parseQualifiersSheet(data: string[][]): {
           currentAssessments.push({
             name: cell,
             options: [],
+            sourceColumn: col,
           });
         }
       }
@@ -119,12 +131,12 @@ export function parseQualifiersSheet(data: string[][]): {
         if (!cell) continue;
 
         // Find which question this column corresponds to
-        const questionIndex = col - 1; // Column B = index 0, Column C = index 1, etc.
-        if (questionIndex < currentAssessments.length) {
+        const assessment = currentAssessments.find((a) => a.sourceColumn === col);
+        if (assessment) {
           // Strip "- " prefix if present
           const option = cell.startsWith("- ") ? cell.slice(2).trim() : cell;
           if (option && !option.endsWith("?")) {
-            currentAssessments[questionIndex].options.push(option);
+            assessment.options.push(option);
           }
         }
       }
@@ -141,6 +153,7 @@ export function parseQualifiersSheet(data: string[][]): {
         assessments: currentAssessments.map((a) => ({
           name: a.name,
           options: [...a.options],
+          sourceColumn: a.sourceColumn,
         })),
       });
     }
@@ -151,49 +164,38 @@ export function parseQualifiersSheet(data: string[][]): {
     (v) => v.assessments.length > 0 && v.assessments.some((a) => a.options.length > 0)
   );
 
-  // Identify universal assessments (those that appear in ALL vegetables)
+  // Identify universal assessments (those that appear in ALL vegetables with the
+  // same answer options). Same-named crop-specific questions can have different
+  // options, so those must stay attached to their crop.
   const universalQualifiers: UniversalQualifier[] = [];
   const universalAssessmentNames = new Set<string>();
 
   if (filteredVegetables.length > 0) {
-    // Count how many times each assessment name appears
-    const assessmentCounts = new Map<string, number>();
-    const assessmentData = new Map<
-      string,
-      { options: string[]; firstSeenIndex: number }
-    >();
+    const firstVegetable = filteredVegetables[0];
+    const optionSignature = (options: string[]) => JSON.stringify(options);
 
-    for (const veg of filteredVegetables) {
-      const uniqueAssessmentNames = new Set(veg.assessments.map((a) => a.name));
-      for (const assessmentName of uniqueAssessmentNames) {
-        assessmentCounts.set(assessmentName, (assessmentCounts.get(assessmentName) || 0) + 1);
-      }
-
-      // Store assessment data from first occurrence
-      for (let i = 0; i < veg.assessments.length; i++) {
-        const assessment = veg.assessments[i];
-        if (!assessmentData.has(assessment.name)) {
-          assessmentData.set(assessment.name, {
-            options: assessment.options,
-            firstSeenIndex: i, // Track original column order
-          });
-        }
-      }
-    }
-
-    // Extract universal assessments (appear in all vegetables)
+    // Extract universal assessments from the first crop's questions only when
+    // every crop has an exact same-named question with the same options.
     const totalVegetables = filteredVegetables.length;
-    for (const [name, count] of assessmentCounts.entries()) {
-      if (count === totalVegetables) {
-        universalAssessmentNames.add(name);
-        const data = assessmentData.get(name);
-        if (data) {
-          universalQualifiers.push({
-            name,
-            options: data.options,
-            order: data.firstSeenIndex, // Use original column position as order
-          });
-        }
+    for (const assessment of firstVegetable.assessments) {
+      if (assessment.options.length === 0) continue;
+
+      const expectedOptions = optionSignature(assessment.options);
+      const matchingVegetableCount = filteredVegetables.filter((veg) =>
+        veg.assessments.some(
+          (candidate) =>
+            candidate.name === assessment.name &&
+            optionSignature(candidate.options) === expectedOptions
+        )
+      ).length;
+
+      if (matchingVegetableCount === totalVegetables) {
+        universalAssessmentNames.add(assessment.name);
+        universalQualifiers.push({
+          name: assessment.name,
+          options: assessment.options,
+          order: assessment.sourceColumn - 1, // Column B becomes order 0
+        });
       }
     }
 
@@ -209,7 +211,14 @@ export function parseQualifiersSheet(data: string[][]): {
   }
 
   return {
-    vegetables: filteredVegetables,
+    vegetables: filteredVegetables.map((vegetable) => ({
+      name: vegetable.name,
+      location: vegetable.location,
+      assessments: vegetable.assessments.map((assessment) => ({
+        name: assessment.name,
+        options: assessment.options,
+      })),
+    })),
     universalQualifiers,
   };
 }

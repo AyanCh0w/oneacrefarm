@@ -395,10 +395,18 @@ function DataEntryForm({
   const [notes, setNotes] = useState("");
 
   const answeredCount = Object.keys(responses).length;
-  const allAnswered = assessments.every((a) => responses[a.name]);
+  const hasLogContent = answeredCount > 0 || notes.trim().length > 0;
 
   const handleOptionSelect = (question: string, answer: string) => {
     setResponses((prev) => ({ ...prev, [question]: answer }));
+  };
+
+  const handleClearResponse = (question: string) => {
+    setResponses((prev) => {
+      const next = { ...prev };
+      delete next[question];
+      return next;
+    });
   };
 
   const handleSubmit = () => {
@@ -408,7 +416,7 @@ function DataEntryForm({
         answer,
       }),
     );
-    onSubmit(formattedResponses, notes || undefined);
+    onSubmit(formattedResponses, notes.trim() || undefined);
   };
 
   return (
@@ -479,11 +487,12 @@ function DataEntryForm({
       </Card>
 
       {/* Progress indicator */}
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
         <span className="text-muted-foreground">
-          {answeredCount} of {assessments.length} answered
+          {answeredCount} of {assessments.length} answered. Blank questions
+          will be skipped.
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {assessments.map((a, index) => (
             <div
               key={index}
@@ -501,9 +510,21 @@ function DataEntryForm({
         {assessments.map((assessment) => (
           <Card key={assessment.name}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">
-                {assessment.name}
-              </CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="min-w-0 flex-1 text-base font-medium">
+                  {assessment.name}
+                </CardTitle>
+                {responses[assessment.name] && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleClearResponse(assessment.name)}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="flex flex-wrap gap-2">
@@ -548,12 +569,12 @@ function DataEntryForm({
       {/* Submit button */}
       <Button
         onClick={handleSubmit}
-        disabled={!allAnswered}
+        disabled={!hasLogContent}
         className="w-full h-14 text-lg"
       >
-        {allAnswered
+        {hasLogContent
           ? "Submit Log"
-          : `Answer all questions (${answeredCount}/${assessments.length})`}
+          : "Answer at least one question or add a note"}
       </Button>
     </div>
   );
