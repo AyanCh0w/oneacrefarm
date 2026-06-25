@@ -112,7 +112,8 @@ export function parseQualifiersSheet(data: string[][]): {
         .filter((n) => n.length > 0);
 
       // Extract assessment headers from columns B onwards (row with vegetable name).
-      // Some source headers are labels like "Head size" or "Timing", not questions.
+      // Headers do not always end in "?" (for example, "Head size"), but they
+      // still need to stay attached to their original option columns.
       currentAssessments = [];
       for (let col = 1; col < row.length; col++) {
         const cell = row[col]?.trim() || "";
