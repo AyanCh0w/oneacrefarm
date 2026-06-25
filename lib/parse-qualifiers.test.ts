@@ -8,6 +8,9 @@ test("keeps non-question assessment labels aligned with their source columns", (
     ["", "- too much", "- quickly", "- too close", "- very"],
     ["", "- not enough", "- slowly", "- perfect", "- not very"],
     ["", "", "", "- too far", ""],
+    ["Chard", "Planting quantity?"],
+    ["", "- too much"],
+    ["", "- not enough"],
     [
       "Broccoli",
       "Planting quantity?",
@@ -15,10 +18,11 @@ test("keeps non-question assessment labels aligned with their source columns", (
       "Bolting?",
       "Side shoots?",
       "Black rot?",
+      "Timing",
     ],
-    ["", "- too much", "- small", "- yes", "- lots", "- yes"],
-    ["", "- not enough", "- medium", "- no", "- not many", "- no"],
-    ["", "", "- large", "", "", ""],
+    ["", "- too much", "- small", "- yes", "- lots", "- yes", "- too early"],
+    ["", "- not enough", "- medium", "- no", "- not many", "- no", "- too late"],
+    ["", "", "- large", "", "", "", ""],
   ];
 
   const { vegetables, universalQualifiers } = parseQualifiersSheet(data);
@@ -52,6 +56,10 @@ test("keeps non-question assessment labels aligned with their source columns", (
         {
           name: "Black rot?",
           options: ["yes", "no"],
+        },
+        {
+          name: "Timing",
+          options: ["too early", "too late"],
         },
       ],
     }
