@@ -303,39 +303,80 @@ export const syncQualifiers = mutation({
   handler: async (ctx, args) => {
     const { qualifiers } = args;
     const results = [];
+    const now = Date.now();
+
+    const normalizeLocation = (location: string | undefined) => {
+      const trimmed = location?.trim();
+      return trimmed ? trimmed : undefined;
+    };
+
+    const qualifierKey = (name: string, location: string | undefined) =>
+      `${name.trim().toLowerCase()}::${normalizeLocation(location)?.toLowerCase() ?? ""}`;
+
+    const existingQualifiers = await ctx.db.query("qualifiers").collect();
+    const existingByKey = new Map<string, typeof existingQualifiers>();
+
+    for (const existing of existingQualifiers) {
+      const key = qualifierKey(existing.name, existing.location);
+      existingByKey.set(key, [...(existingByKey.get(key) ?? []), existing]);
+    }
+
+    const seenKeys = new Set<string>();
 
     for (const qualifier of qualifiers) {
-      // Check if this qualifier already exists (by name AND location)
-      const existing = await ctx.db
-        .query("qualifiers")
-        .withIndex("by_name_and_location", (q) =>
-          q.eq("name", qualifier.name).eq("location", qualifier.location ?? undefined)
-        )
-        .first();
+      const name = qualifier.name.trim();
+      const location = normalizeLocation(qualifier.location);
+      const key = qualifierKey(name, location);
+      const matches = existingByKey.get(key) ?? [];
+      const existing = matches[0];
+
+      seenKeys.add(key);
+
+      const qualifierRecord = {
+        name,
+        ...(location ? { location } : {}),
+        assessments: qualifier.assessments,
+        lastSynced: now,
+      };
 
       if (existing) {
-        await ctx.db.patch(existing._id, {
-          assessments: qualifier.assessments,
-          lastSynced: Date.now(),
-        });
+        await ctx.db.replace(existing._id, qualifierRecord);
         results.push({
-          name: qualifier.name,
-          location: qualifier.location,
+          name,
+          location,
           action: "updated",
           id: existing._id,
         });
+
+        for (const duplicate of matches.slice(1)) {
+          await ctx.db.delete(duplicate._id);
+          results.push({
+            name: duplicate.name,
+            location: duplicate.location,
+            action: "deleted-duplicate",
+            id: duplicate._id,
+          });
+        }
       } else {
-        const id = await ctx.db.insert("qualifiers", {
-          name: qualifier.name,
-          location: qualifier.location,
-          assessments: qualifier.assessments,
-          lastSynced: Date.now(),
-        });
+        const id = await ctx.db.insert("qualifiers", qualifierRecord);
         results.push({
-          name: qualifier.name,
-          location: qualifier.location,
+          name,
+          location,
           action: "created",
           id,
+        });
+      }
+    }
+
+    for (const existing of existingQualifiers) {
+      const key = qualifierKey(existing.name, existing.location);
+      if (!seenKeys.has(key)) {
+        await ctx.db.delete(existing._id);
+        results.push({
+          name: existing.name,
+          location: existing.location,
+          action: "deleted",
+          id: existing._id,
         });
       }
     }
