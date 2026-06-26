@@ -74,6 +74,18 @@ function getEndTimestampFromDate(dateString: string): number {
   return new Date(`${dateString}T23:59:59.999Z`).getTime();
 }
 
+function getFieldNameFromRange(range: string): string {
+  const separatorIndex = range.indexOf("!");
+  const rawFieldName =
+    separatorIndex === -1 ? range : range.slice(0, separatorIndex);
+
+  if (rawFieldName.startsWith("'") && rawFieldName.endsWith("'")) {
+    return rawFieldName.slice(1, -1).replace(/''/g, "'");
+  }
+
+  return rawFieldName;
+}
+
 // ============ Settings (Global Spreadsheet Config) ============
 
 // Get the global spreadsheet settings
@@ -201,9 +213,10 @@ export const syncSheetData = mutation({
       });
     }
 
-    // Clear existing crops for this field (to avoid duplicates on re-sync)
-    if (parsedData && parsedData.length > 0) {
-      const fieldName = parsedData[0].field;
+    // Clear existing crops for this field whenever parsed field data is synced,
+    // including when the source sheet is now empty.
+    if (parsedData) {
+      const fieldName = parsedData[0]?.field ?? getFieldNameFromRange(range);
       const existingCrops = await ctx.db
         .query("crops")
         .withIndex("by_field", (q) => q.eq("field", fieldName))

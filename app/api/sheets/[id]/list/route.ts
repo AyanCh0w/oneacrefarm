@@ -1,6 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { GoogleSheetsClient } from "@/lib/google-sheets";
+import { isApproved } from "@/lib/auth";
 
 export async function GET(
   request: Request,
@@ -11,6 +12,10 @@ export async function GET(
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!(await isApproved())) {
+      return NextResponse.json({ error: "Account not approved" }, { status: 403 });
     }
 
     const { id: spreadsheetId } = await params;

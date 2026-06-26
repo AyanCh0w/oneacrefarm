@@ -61,10 +61,37 @@ export function MapboxMap({
   const markersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(
     new globalThis.Map(),
   );
+  const callbacksRef = useRef({
+    onMapLoad,
+    onFeaturesLoad,
+    onFeatureClick,
+  });
+  const optionsRef = useRef({
+    initialCenter,
+    initialZoom,
+    initialBearing,
+    initialPitch,
+    minZoom,
+    maxZoom,
+    maxBounds,
+    style,
+    interactiveLayers,
+    autoDiscoverLayers,
+    showFieldLabels,
+  });
   const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
+    callbacksRef.current = {
+      onMapLoad,
+      onFeaturesLoad,
+      onFeatureClick,
+    };
+  }, [onMapLoad, onFeaturesLoad, onFeatureClick]);
+
+  useEffect(() => {
     if (!mapContainer.current || map.current) return;
+    const options = optionsRef.current;
 
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     if (!token) {
@@ -78,14 +105,14 @@ export function MapboxMap({
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style,
-      center: initialCenter,
-      zoom: initialZoom,
-      bearing: initialBearing,
-      pitch: initialPitch,
-      minZoom,
-      maxZoom,
-      maxBounds,
+      style: options.style,
+      center: options.initialCenter,
+      zoom: options.initialZoom,
+      bearing: options.initialBearing,
+      pitch: options.initialPitch,
+      minZoom: options.minZoom,
+      maxZoom: options.maxZoom,
+      maxBounds: options.maxBounds,
     });
 
     //map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
@@ -99,70 +126,93 @@ export function MapboxMap({
 
     map.current.on("load", () => {
       setMapLoaded(true);
-      if (onMapLoad && map.current) {
-        onMapLoad(map.current);
+      const currentMap = map.current;
+      if (!currentMap) return;
+
+      callbacksRef.current.onMapLoad?.(currentMap);
+
+      const mapStyle = currentMap.getStyle();
+      const fillLayerIds =
+        mapStyle?.layers
+          ?.filter((layer) => layer.type === "fill" && layer.source)
+          .map((layer) => layer.id) ?? [];
+      const queryLayerIds = options.autoDiscoverLayers
+        ? fillLayerIds
+        : options.interactiveLayers;
+      const queryOptions =
+        queryLayerIds.length > 0 ? { layers: queryLayerIds } : undefined;
+
+      const toMapFeature = (
+        feature: mapboxgl.MapboxGeoJSONFeature,
+      ): MapFeature => ({
+        id: feature.id,
+        layerId: feature.layer?.id || "",
+        properties: feature.properties || {},
+        geometry: feature.geometry,
+      });
+
+      if (callbacksRef.current.onFeaturesLoad) {
+        const features = (
+          queryOptions
+            ? currentMap.queryRenderedFeatures(queryOptions)
+            : currentMap.queryRenderedFeatures()
+        ).map(toMapFeature);
+        callbacksRef.current.onFeaturesLoad(features);
       }
 
-      // Click anywhere on map to get features at that point
-      if (onFeatureClick && map.current) {
-        map.current.on("click", (e) => {
-          const features = map.current!.queryRenderedFeatures(e.point);
-          if (features.length > 0) {
-            const feature = features[0];
-            console.log("Clicked feature:", feature.properties);
-            onFeatureClick({
-              id: feature.id,
-              layerId: feature.layer?.id || "",
-              properties: feature.properties || {},
-              geometry: feature.geometry,
-            });
-          }
-        });
-      }
+      // Click anywhere on map to get features at that point.
+      currentMap.on("click", (e) => {
+        const onFeatureClick = callbacksRef.current.onFeatureClick;
+        if (!onFeatureClick) return;
+
+        const features = currentMap.queryRenderedFeatures(
+          e.point,
+          queryOptions,
+        );
+        if (features.length > 0) {
+          onFeatureClick(toMapFeature(features[0]));
+        }
+      });
 
       // Add field name labels on polygons
-      if (showFieldLabels && map.current) {
-        const mapStyle = map.current.getStyle();
-        if (mapStyle?.layers) {
-          // Find fill layers that might be fields
-          const fillLayers = mapStyle.layers.filter(
-            (layer) => layer.type === "fill" && layer.source,
-          );
+      if (options.showFieldLabels && mapStyle?.layers) {
+        // Find fill layers that might be fields.
+        const fillLayers = mapStyle.layers.filter(
+          (layer) => layer.type === "fill" && layer.source,
+        );
 
-          fillLayers.forEach((layer) => {
-            const sourceId = layer.source as string;
-            const labelLayerId = `${layer.id}-labels`;
+        fillLayers.forEach((layer) => {
+          const sourceId = layer.source as string;
+          const labelLayerId = `${layer.id}-labels`;
 
-            // Check if label layer already exists
-            if (!map.current!.getLayer(labelLayerId)) {
-              const sourceLayer = (layer as Record<string, unknown>)[
-                "source-layer"
-              ] as string | undefined;
-              map.current!.addLayer({
-                id: labelLayerId,
-                type: "symbol",
-                source: sourceId,
-                ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
-                layout: {
-                  "text-field": [
-                    "coalesce",
-                    ["get", "name"],
-                    ["get", "Name"],
-                    "",
-                  ],
-                  "text-size": 12,
-                  "text-anchor": "center",
-                  "text-allow-overlap": false,
-                },
-                paint: {
-                  "text-color": "#ffffff",
-                  "text-halo-color": "#000000",
-                  "text-halo-width": 1,
-                },
-              });
-            }
+          if (currentMap.getLayer(labelLayerId)) return;
+
+          const sourceLayer = (layer as Record<string, unknown>)[
+            "source-layer"
+          ] as string | undefined;
+          currentMap.addLayer({
+            id: labelLayerId,
+            type: "symbol",
+            source: sourceId,
+            ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
+            layout: {
+              "text-field": [
+                "coalesce",
+                ["get", "name"],
+                ["get", "Name"],
+                "",
+              ],
+              "text-size": 12,
+              "text-anchor": "center",
+              "text-allow-overlap": false,
+            },
+            paint: {
+              "text-color": "#ffffff",
+              "text-halo-color": "#000000",
+              "text-halo-width": 1,
+            },
           });
-        }
+        });
       }
     });
 

@@ -1,8 +1,8 @@
-import { ConvexHttpClient } from "convex/browser";
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+import { getConvexHttpClient } from "@/lib/convex-http";
+import { isApproved } from "@/lib/auth";
 
 type ExportRequestBody = {
   start_date?: string;
@@ -11,6 +11,42 @@ type ExportRequestBody = {
 };
 
 class ValidationError extends Error {}
+
+function getBearerToken(request: NextRequest) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const [scheme, token] = authorization.split(/\s+/, 2);
+
+  if (scheme.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+
+  return token;
+}
+
+function isValidExportToken(token: string | null) {
+  const expectedToken = process.env.QUALITY_LOGS_EXPORT_TOKEN;
+
+  if (!expectedToken || !token) {
+    return false;
+  }
+
+  const tokenBuffer = Buffer.from(token);
+  const expectedTokenBuffer = Buffer.from(expectedToken);
+
+  if (tokenBuffer.length !== expectedTokenBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(tokenBuffer, expectedTokenBuffer);
+}
+
+async function canExportQualityLogs(request: NextRequest) {
+  if (isValidExportToken(getBearerToken(request))) {
+    return true;
+  }
+
+  return isApproved();
+}
 
 function parseDateInput(
   value: string,
@@ -147,6 +183,10 @@ function buildCsv(
 
 export async function POST(request: NextRequest) {
   try {
+    if (!(await canExportQualityLogs(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = (await request.json()) as ExportRequestBody;
     const startDateInput = body.start_date ?? body.start_data;
     const endDateInput = body.end_date;
@@ -172,10 +212,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const logs = await convex.query(api.sheets.getQualityLogsInDateRange, {
-      startTimestamp,
-      endTimestamp,
-    });
+    const logs = await getConvexHttpClient().query(
+      api.sheets.getQualityLogsInDateRange,
+      {
+        startTimestamp,
+        endTimestamp,
+      }
+    );
 
     const csv = buildCsv(logs);
     const fileName = `quality-logs-${startDateInput}-to-${endDateInput}.csv`;

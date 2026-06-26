@@ -6,6 +6,12 @@ This document describes all API routes in the One Acre Farm Crop Logger applicat
 
 All API routes require Clerk authentication. Requests without a valid session return `401 Unauthorized`. Routes that require Google OAuth access will return `400 Bad Request` if no Google account is linked.
 
+The scheduled quality-log export endpoint also accepts machine access for external jobs such as Databricks. Set `QUALITY_LOGS_EXPORT_TOKEN` in the app environment, then send it as a bearer token:
+
+```http
+Authorization: Bearer <QUALITY_LOGS_EXPORT_TOKEN>
+```
+
 ---
 
 ## GET /api/spreadsheets
@@ -197,6 +203,37 @@ Parsed crop object:
 - `401`: User not authenticated
 - `400`: No Google account linked OR missing sheetName in body
 - `500`: Failed to sync sheet data
+
+---
+
+## POST /api/quality-logs/export
+
+Exports quality logs as CSV for a date range. This endpoint is intended for both signed-in app users and scheduled external jobs.
+
+### Authentication
+- Browser/app usage: approved Clerk session
+- External jobs: `Authorization: Bearer <QUALITY_LOGS_EXPORT_TOKEN>`
+
+### Input
+```json
+{
+  "start_date": "01-01-2026",
+  "end_date": "01-31-2026"
+}
+```
+
+Dates must be formatted as `MM-DD-YYYY`.
+
+### Output
+
+**Success (200)**
+- Response body: CSV
+- `Content-Type`: `text/csv; charset=utf-8`
+
+**Errors**
+- `401`: Missing/invalid Clerk session or bearer token
+- `400`: Missing or invalid date input
+- `500`: Failed to export quality logs
 
 ---
 

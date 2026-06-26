@@ -3,12 +3,14 @@ import { NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
+  "/analytics(.*)",
+  "/log-data(.*)",
   "/qualifiers(.*)",
   "/onboarding(.*)",
   "/api/(.*)",
 ]);
 
-const isPublicRoute = createRouteMatcher([
+const isMachineAccessibleApi = createRouteMatcher([
   "/api/quality-logs/export",
 ]);
 
@@ -16,9 +18,11 @@ const isPendingRoute = createRouteMatcher(["/pending-approval"]);
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims } = await auth();
+  const requiresClerkSession =
+    isProtectedRoute(req) && !isMachineAccessibleApi(req);
 
   // If accessing protected routes, require authentication
-  if (isProtectedRoute(req) && !isPublicRoute(req)) {
+  if (requiresClerkSession) {
     await auth.protect();
   }
 
@@ -37,7 +41,7 @@ export default clerkMiddleware(async (auth, req) => {
     }
 
     // Not approved and trying to access protected route
-    if (!isApproved && isProtectedRoute(req)) {
+    if (!isApproved && requiresClerkSession) {
       return NextResponse.redirect(new URL("/pending-approval", req.url));
     }
 

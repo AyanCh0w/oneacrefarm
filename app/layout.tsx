@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { Providers } from "./providers";
+import { AutoSyncOnLogin } from "@/components/auto-sync-on-login";
 import { ThemeSync } from "@/components/theme-sync";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const footerLinkBase =
@@ -92,6 +94,7 @@ export default function RootLayout({
         >
           <ThemeSync />
           <Providers>
+            <AutoSyncOnLogin />
             <div className="flex min-h-screen flex-col">
               <main className="flex-1">{children}</main>
               <footer className="border-t border-border/60 bg-card/40">
@@ -139,6 +142,7 @@ export default function RootLayout({
                 </div>
               </footer>
             </div>
+            <Toaster />
           </Providers>
         </body>
       </html>

@@ -1,12 +1,10 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { getConvexHttpClient } from "@/lib/convex-http";
 import { GoogleSheetsClient } from "@/lib/google-sheets";
 import { parseQualifiersSheet } from "@/lib/parse-qualifiers";
 import { isAdmin } from "@/lib/auth";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * Extract replanting information from notes.
@@ -18,8 +16,6 @@ function parseReplantingNotes(notes: string): {
   replantingNote?: string;
 } | null {
   if (!notes) return null;
-
-  const lowerNotes = notes.toLowerCase();
 
   // Pattern: "X replaced with Y" or "replaced with Y"
   const replacedWithMatch = notes.match(
@@ -47,6 +43,97 @@ function parseReplantingNotes(notes: string): {
   }
 
   return null;
+}
+
+function detectLocationFromField(fieldName: string): string {
+  const normalized = fieldName.toLowerCase();
+
+  if (
+    /\bht\b/.test(normalized) ||
+    normalized.includes("high tunnel") ||
+    normalized.includes("hightunnel")
+  ) {
+    return "HT";
+  }
+
+  if (/\bgh\b/.test(normalized) || normalized.includes("greenhouse")) {
+    return "greenhouse";
+  }
+
+  return "field";
+}
+
+function parseCropVariety(value: string): { crop: string; variety: string } {
+  const separatorIndex = value.indexOf(":");
+
+  if (separatorIndex === -1) {
+    return { crop: value.trim(), variety: "" };
+  }
+
+  return {
+    crop: value.slice(0, separatorIndex).trim(),
+    variety: value.slice(separatorIndex + 1).trim(),
+  };
+}
+
+function buildCropRecord({
+  sheetName,
+  bed,
+  crop,
+  variety,
+  trays,
+  rows,
+  date,
+  notes,
+}: {
+  sheetName: string;
+  bed: string;
+  crop: string;
+  variety: string;
+  trays: string;
+  rows: string;
+  date: string;
+  notes: string;
+}) {
+  const record: {
+    field: string;
+    bed: string;
+    crop: string;
+    variety: string;
+    trays: string;
+    rows: string;
+    date: string;
+    notes: string;
+    location?: string;
+    replantedFrom?: {
+      crop: string;
+      variety: string;
+      date: string;
+      notes: string;
+    };
+  } = {
+    field: sheetName,
+    bed,
+    crop: crop.trim(),
+    variety: variety.trim(),
+    trays,
+    rows,
+    date,
+    notes,
+    location: detectLocationFromField(sheetName),
+  };
+
+  const replantingInfo = parseReplantingNotes(notes);
+  if (replantingInfo) {
+    record.replantedFrom = {
+      crop: replantingInfo.originalCrop || "",
+      variety: replantingInfo.originalVariety || "",
+      date: "",
+      notes: replantingInfo.replantingNote || "",
+    };
+  }
+
+  return record;
 }
 
 // Parse sheet data into structured crop records
@@ -94,80 +181,42 @@ function parseSheetData(
       for (let i = 0; i < cropParts.length; i++) {
         const cropPart = cropParts[i];
         const trayPart = traysParts[i] || traysParts[0] || "";
-
-        let crop = "";
-        let variety = "";
-        if (cropPart?.includes(":")) {
-          [crop, variety] = cropPart.split(":").map((s) => s.trim());
-        } else {
-          crop = cropPart || "";
-        }
+        const { crop, variety } = parseCropVariety(cropPart || "");
 
         if (crop.trim()) {
-          parsedData.push({
-            field: sheetName,
-            bed: bed || "",
-            crop: crop.trim(),
-            variety: variety.trim(),
-            trays: trayPart,
-            rows: rowsCount || "",
-            date: date || "",
-            notes: notes || "",
-          });
+          parsedData.push(
+            buildCropRecord({
+              sheetName,
+              bed: bed || "",
+              crop,
+              variety,
+              trays: trayPart,
+              rows: rowsCount || "",
+              date: date || "",
+              notes: notes || "",
+            })
+          );
         }
       }
       continue;
     }
 
     // Parse crop:variety format (e.g., "Tomato:Roma" or just "Tomato")
-    let crop = "";
-    let variety = "";
-    if (cropVariety?.includes(":")) {
-      [crop, variety] = cropVariety.split(":").map((s) => s.trim());
-    } else {
-      crop = cropVariety || "";
-    }
+    const { crop, variety } = parseCropVariety(cropVariety || "");
 
     if (crop.trim()) {
-      const record: {
-        field: string;
-        bed: string;
-        crop: string;
-        variety: string;
-        trays: string;
-        rows: string;
-        date: string;
-        notes: string;
-        location?: string;
-        replantedFrom?: {
-          crop: string;
-          variety: string;
-          date: string;
-          notes: string;
-        };
-      } = {
-        field: sheetName,
-        bed: bed || "",
-        crop: crop.trim(),
-        variety: variety.trim(),
-        trays: trays || "",
-        rows: rowsCount || "",
-        date: date || "",
-        notes: notes || "",
-      };
-
-      // Check for replanting information in notes
-      const replantingInfo = parseReplantingNotes(notes || "");
-      if (replantingInfo) {
-        record.replantedFrom = {
-          crop: replantingInfo.originalCrop || "",
-          variety: replantingInfo.originalVariety || "",
-          date: "", // We don't know the original date
-          notes: replantingInfo.replantingNote || "",
-        };
-      }
-
-      parsedData.push(record);
+      parsedData.push(
+        buildCropRecord({
+          sheetName,
+          bed: bed || "",
+          crop,
+          variety,
+          trays: trays || "",
+          rows: rowsCount || "",
+          date: date || "",
+          notes: notes || "",
+        })
+      );
     }
   }
 
@@ -257,21 +306,30 @@ export async function POST(
       const { vegetables, universalQualifiers } = parseQualifiersSheet(stringValues);
 
       // Sync crop-specific qualifiers to Convex
-      const qualifiersResult = await convex.mutation(api.sheets.syncQualifiers, {
-        qualifiers: vegetables,
-      });
+      const qualifiersResult = await getConvexHttpClient().mutation(
+        api.sheets.syncQualifiers,
+        {
+          qualifiers: vegetables,
+        }
+      );
 
       // Sync universal qualifiers separately
-      const universalResult = await convex.mutation(api.sheets.syncUniversalQualifiers, {
-        qualifiers: universalQualifiers,
-      });
+      const universalResult = await getConvexHttpClient().mutation(
+        api.sheets.syncUniversalQualifiers,
+        {
+          qualifiers: universalQualifiers,
+        }
+      );
 
       // Also store raw sheet data
-      const sheetResult = await convex.mutation(api.sheets.syncSheetData, {
-        spreadsheetId,
-        range: `${sheetName}!A:ZZ`,
-        data: stringValues,
-      });
+      const sheetResult = await getConvexHttpClient().mutation(
+        api.sheets.syncSheetData,
+        {
+          spreadsheetId,
+          range: `${sheetName}!A:ZZ`,
+          data: stringValues,
+        }
+      );
 
       return NextResponse.json({
         success: true,
@@ -289,12 +347,15 @@ export async function POST(
     const parsedData = parseSheetData(stringValues, sheetName);
 
     // Sync to Convex
-    const convexResult = await convex.mutation(api.sheets.syncSheetData, {
-      spreadsheetId,
-      range: `${sheetName}!A:ZZ`,
-      data: stringValues,
-      parsedData,
-    });
+    const convexResult = await getConvexHttpClient().mutation(
+      api.sheets.syncSheetData,
+      {
+        spreadsheetId,
+        range: `${sheetName}!A:ZZ`,
+        data: stringValues,
+        parsedData,
+      }
+    );
 
     return NextResponse.json({
       success: true,

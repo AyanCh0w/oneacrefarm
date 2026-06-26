@@ -50,6 +50,11 @@ export interface SheetInfo {
   index: number;
 }
 
+function formatSheetRange(sheetName: string, range?: string) {
+  const escapedSheetName = `'${sheetName.replace(/'/g, "''")}'`;
+  return range ? `${escapedSheetName}!${range}` : `${escapedSheetName}!A:ZZ`;
+}
+
 export class GoogleSheetsClient {
   private accessToken: string;
 
@@ -139,12 +144,7 @@ export class GoogleSheetsClient {
     let rangeParam: string;
 
     if (sheetName) {
-      const escapedSheetName = sheetName.includes(" ")
-        ? `'${sheetName}'`
-        : sheetName;
-      rangeParam = range
-        ? `${escapedSheetName}!${range}`
-        : `${escapedSheetName}!A:ZZ`;
+      rangeParam = formatSheetRange(sheetName, range);
     } else {
       rangeParam = range || "A:ZZ";
     }

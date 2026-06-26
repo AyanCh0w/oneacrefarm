@@ -214,24 +214,6 @@ function ViewToggle({
   );
 }
 
-function CropCardSkeleton() {
-  return (
-    <div className="p-4 rounded-xl border border-border bg-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-        <Skeleton className="h-6 w-16 rounded-full" />
-      </div>
-      <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-2">
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-4 w-16" />
-      </div>
-    </div>
-  );
-}
-
 function QuestionSkeleton() {
   return (
     <Card className="animate-pulse">
@@ -347,33 +329,6 @@ function CropCard({
           </p>
         </div>
       )}
-    </button>
-  );
-}
-
-// Option Button for Qualifiers
-function OptionButton({
-  option,
-  isSelected,
-  onSelect,
-}: {
-  option: string;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      className={cn(
-        "w-full p-4 rounded-xl border-2 text-center font-medium text-lg",
-        "transition-all duration-200 active:scale-[0.97]",
-        "min-h-16 flex items-center justify-center",
-        isSelected
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card hover:border-primary/50 hover:bg-primary/5",
-      )}
-    >
-      {option}
     </button>
   );
 }
@@ -670,7 +625,7 @@ export default function LogDataPage() {
 
   uniqueFields?.forEach((field) => {
     if (field.includes(":")) {
-      const [parent, subfield] = field.split(":");
+      const [parent] = field.split(":");
       const parentKey = parent.trim();
       if (!groupedFields[parentKey]) {
         groupedFields[parentKey] = [];

@@ -1,5 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { isApproved } from "@/lib/auth";
 
 const DRIVE_API_BASE = "https://www.googleapis.com/drive/v3";
 
@@ -13,6 +14,10 @@ export async function GET(
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!(await isApproved())) {
+      return NextResponse.json({ error: "Account not approved" }, { status: 403 });
     }
 
     // Get spreadsheet ID from params
