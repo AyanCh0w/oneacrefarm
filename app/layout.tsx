@@ -19,15 +19,28 @@ export const metadata: Metadata = {
   description: "One Acre Farm Crop Logger",
   manifest: "/manifest.webmanifest",
   icons: {
-    apple: "/AppIcons/Assets.xcassets/AppIcon.appiconset/180.png",
-    icon: [
+    apple: [
       {
-        url: "/AppIcons/android/mipmap-xxxhdpi/Crop Logger.png",
-        sizes: "192x192",
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
         type: "image/png",
       },
+    ],
+    icon: [
       {
-        url: "/AppIcons/Assets.xcassets/AppIcon.appiconset/1024.png",
+        url: "/icons/favicon-light-32.png",
+        sizes: "32x32",
+        type: "image/png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/icons/favicon-dark-32.png",
+        sizes: "32x32",
+        type: "image/png",
+        media: "(prefers-color-scheme: dark)",
+      },
+      {
+        url: "/icons/app-icon-light.png",
         sizes: "1024x1024",
         type: "image/png",
       },
@@ -41,7 +54,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8faf8" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
   viewportFit: "cover",
 };
 
@@ -66,7 +82,6 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <head>
-          <link rel="apple-touch-icon" href="/AppIcons/Assets.xcassets/AppIcon.appiconset/180.png" />
           <script
             dangerouslySetInnerHTML={{
               __html: `
