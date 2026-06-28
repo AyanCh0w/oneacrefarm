@@ -24,6 +24,13 @@ export const metadata: Metadata = {
         url: "/icons/apple-touch-icon.png",
         sizes: "180x180",
         type: "image/png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/icons/apple-touch-icon-dark.png",
+        sizes: "180x180",
+        type: "image/png",
+        media: "(prefers-color-scheme: dark)",
       },
     ],
     icon: [
@@ -86,13 +93,18 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{
               __html: `
                 (function() {
-                  try {
+                  function syncTheme() {
                     var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                     if (prefersDark) {
                       document.documentElement.classList.add('dark');
                     } else {
                       document.documentElement.classList.remove('dark');
                     }
+                  }
+                  try {
+                    syncTheme();
+                    window.addEventListener('pageshow', syncTheme);
+                    document.addEventListener('visibilitychange', syncTheme);
                   } catch (e) {}
                   if ('serviceWorker' in navigator) {
                     window.addEventListener('load', function() {
